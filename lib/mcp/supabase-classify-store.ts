@@ -10,13 +10,10 @@ function check(error: { code?: string } | null, what: string): void {
 }
 
 export function createSupabaseClassifyStore(client: SupabaseClient): ClassifyStore {
-  async function listIdsByStatus(status: "pending" | "waiting", limit: number): Promise<string[]> {
-    const { data, error } = await client
-      .from("cards")
-      .select("id")
-      .eq("classification_status", status)
-      .order("created_at", { ascending: true })
-      .limit(limit);
+  async function listIdsByStatus(status: "pending" | "waiting", limit: number, olderThanMs?: number): Promise<string[]> {
+    let query = client.from("cards").select("id").eq("classification_status", status);
+    if (olderThanMs !== undefined) query = query.lt("updated_at", new Date(Date.now() - olderThanMs).toISOString());
+    const { data, error } = await query.order("created_at", { ascending: true }).limit(limit);
     check(error, "분류 대기 카드 읽기");
     return (data ?? []).map((r) => r.id);
   }
@@ -48,8 +45,8 @@ export function createSupabaseClassifyStore(client: SupabaseClient): ClassifySto
       };
     },
 
-    async listPendingCardIds(limit: number): Promise<string[]> {
-      return listIdsByStatus("pending", limit);
+    async listPendingCardIds(limit: number, olderThanMs?: number): Promise<string[]> {
+      return listIdsByStatus("pending", limit, olderThanMs);
     },
 
     async listWaitingCardIds(limit: number): Promise<string[]> {

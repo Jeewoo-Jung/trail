@@ -22,5 +22,7 @@ describe("loadRecordRules", () => {
     expect(rules).toContain("Trail 기록 규칙");
     expect(rules).toContain("list_cards");
     expect(rules?.endsWith(RULES_NOTE)).toBe(true);
+    expect(RULES_NOTE).toContain("projectTopics");
+    expect(RULES_NOTE).not.toContain("사용자 지침");
   });
 });

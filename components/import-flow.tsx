@@ -81,7 +81,7 @@ export function ImportFlow() {
       {step === "preview" && digest && (
         <div className="flex flex-col gap-4">
           <p className="text-sm">{fileInfo} · {digestChars(digest).toLocaleString("ko-KR")}자</p>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">아래 내용이 <strong>Claude API로 전송</strong>됩니다. 키·비밀번호처럼 보이는 글자는 이미 가려 두었습니다. 보내고 싶지 않으면 다른 파일을 고르세요.</p>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">아래 내용이 <strong>Claude API로 전송</strong>됩니다. 키·토큰처럼 보이는 글자는 자동으로 가렸지만 모든 모양을 잡지는 못합니다. 직접 훑어보고, 보내고 싶지 않은 내용이 있으면 다른 파일을 고르세요.</p>
           <ul className="flex max-h-96 flex-col gap-3 overflow-y-auto rounded-lg border border-black/15 p-3 text-xs dark:border-white/20">
             {digest.conversations.map((c, i) => (
               <li key={i} className="flex flex-col gap-1">

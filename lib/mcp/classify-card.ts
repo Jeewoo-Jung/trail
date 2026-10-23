@@ -25,8 +25,9 @@ export async function classifyCard(store: ClassifyStore, classifier: Classifier,
       topConcepts: tops.map((t) => t.name),
       approvedSubConcepts: subs.flatMap((s) => (s.status === "approved" && topName.has(s.topId) ? [{ top: topName.get(s.topId)!, name: s.name }] : [])),
     });
-    const decision = decideClassification(raw, tops, subs);
-    if (!decision) throw new Error("분류 결과가 규칙에 맞지 않음");
+    // 규칙에 맞지 않는 출력(목록 밖 상위 개념 등)은 새 상위 개념을 만들지 않고 "미분류"로 확정한다.
+    // 한도 오류처럼 "대기"로 두면, 같은 이상한 출력이 반복될 때 뒤의 대기 카드까지 다시 분류되지 못하고 비용만 나간다.
+    const decision = decideClassification(raw, tops, subs) ?? { topId: null, sub: null };
     let subId: string | null = null;
     if (decision.sub?.kind === "existing") subId = decision.sub.id;
     else if (decision.sub?.kind === "propose" && decision.topId) subId = await store.createSubProposal(decision.topId, decision.sub.name);
@@ -51,11 +52,22 @@ export async function reclassifyWaiting(store: ClassifyStore, classifier: Classi
 
 export const CLASSIFY_BATCH_MAX = 10;
 
-/** 기록 직후에 돌린다: "분류 중" 카드를 분류하고, 모두 성공했을 때만 대기 카드도 다시 분류한다(한도에 막혔는데 또 부르지 않기 위해). */
-export async function classifyPendingThenWaiting(store: ClassifyStore, classifier: Classifier): Promise<void> {
-  const ids = await store.listPendingCardIds(CLASSIFY_BATCH_MAX);
-  for (const id of ids) {
-    if ((await classifyCard(store, classifier, id)) === "waiting") return;
+/** 카드를 차례로 분류한다. 호출이 실패하면(한도 등) 거기서 멈추고, 아직 처리하지 못한 나머지도 "미분류(대기)"로 돌려 놓아 다시 분류될 수 있게 한다. */
+async function classifyInOrder(store: ClassifyStore, classifier: Classifier, ids: readonly string[]): Promise<boolean> {
+  for (let i = 0; i < ids.length; i += 1) {
+    if ((await classifyCard(store, classifier, ids[i])) !== "waiting") continue;
+    for (const rest of ids.slice(i + 1)) await store.markWaiting(rest);
+    return false;
   }
+  return true;
+}
+
+/**
+ * "분류 중" 카드를 분류하고, 모두 성공했을 때만 대기 카드도 다시 분류한다(한도에 막혔는데 또 부르지 않기 위해).
+ * olderThanMs를 주면 그보다 오래 "분류 중"에 머문 카드만 대상으로 한다 — 기록 직후 작업이 끊겨 남은 카드를 화면을 열 때 되살린다.
+ */
+export async function classifyPendingThenWaiting(store: ClassifyStore, classifier: Classifier, options: { olderThanMs?: number } = {}): Promise<void> {
+  const ids = await store.listPendingCardIds(CLASSIFY_BATCH_MAX, options.olderThanMs);
+  if (!(await classifyInOrder(store, classifier, ids))) return;
   await reclassifyWaiting(store, classifier);
 }

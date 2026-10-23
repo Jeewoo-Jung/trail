@@ -1,0 +1,9 @@
+# Vercel CLI로 배포할 때 올라가면 안 되는 것들. (git 연결 배포는 git에 있는 파일만 올라가므로 이중 방어다.)
+private-imports/
+trash-can/
+.env
+.env.*
+!.env.example
+prototype-v1.html
+.bkit/
+.claude/

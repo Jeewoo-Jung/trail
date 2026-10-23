@@ -57,10 +57,17 @@ describe("classifyCard", () => {
     expect(await classifyCard(s, failing, "a")).toBe("waiting");
     expect(s.status.get("a")).toBe("waiting");
   });
-  it("목록 밖 상위 개념이 오면 새 상위 개념을 만들지 않고 대기로 둔다", async () => {
+  it("목록 밖 상위 개념이 오면 새 상위 개념을 만들지 않고 미분류로 확정한다(대기로 두지 않는다)", async () => {
     const s = new FakeClassifyStore(); s.addCard("a");
-    expect(await classifyCard(s, ok({ top: "요리" }), "a")).toBe("waiting");
+    expect(await classifyCard(s, ok({ top: "요리" }), "a")).toBe("done");
     expect(s.tops).toHaveLength(1);
+    expect(s.saved.get("a")).toEqual({ topId: null, subId: null });
+    expect(s.status.get("a")).toBe("done");
+  });
+  it("모양이 다른 출력도 미분류로 확정한다", async () => {
+    const s = new FakeClassifyStore(); s.addCard("a");
+    expect(await classifyCard(s, ok("엉뚱한 글"), "a")).toBe("done");
+    expect(s.saved.get("a")).toEqual({ topId: null, subId: null });
   });
   it("없는 카드는 건드리지 않는다", async () => {
     expect(await classifyCard(new FakeClassifyStore(), ok({ top: "미분류" }), "zzz")).toBe("missing");
@@ -100,5 +107,20 @@ describe("classifyPendingThenWaiting", () => {
     await classifyPendingThenWaiting(s, async () => { calls++; throw new Error("limit"); });
     expect(calls).toBe(1);
     expect(s.status.get("p")).toBe("waiting");
+  });
+  it("중간에 한도에 닿으면 아직 처리하지 못한 나머지 분류 중 카드도 대기로 돌려 다시 분류될 수 있게 한다", async () => {
+    const s = new FakeClassifyStore(); s.addCard("p1"); s.addCard("p2"); s.addCard("p3");
+    let calls = 0;
+    await classifyPendingThenWaiting(s, async () => { if (++calls === 2) throw new Error("limit"); return { top: "취업준비" }; });
+    expect(calls).toBe(2);
+    expect([s.status.get("p1"), s.status.get("p2"), s.status.get("p3")]).toEqual(["done", "waiting", "waiting"]);
+    // 나중에 한도가 풀리면 다시 분류된다
+    await reclassifyWaiting(s, ok({ top: "취업준비" }));
+    expect([...s.status.values()]).toEqual(["done", "done", "done"]);
+  });
+  it("이상한 출력이 반복돼도 뒤의 카드가 막히지 않는다", async () => {
+    const s = new FakeClassifyStore(); s.addCard("w1", "waiting"); s.addCard("w2", "waiting"); s.addCard("w3", "waiting");
+    const r = await reclassifyWaiting(s, ok({ top: "없는개념" }));
+    expect(r).toEqual({ done: 3, stillWaiting: 0 });
   });
 });
