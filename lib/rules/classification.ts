@@ -36,7 +36,8 @@ export function decideClassification(
   const matchedTop = tops.find((t) => normalizeTopic(t.name) === topKey);
   if (!matchedTop) return null;
 
-  const subName = (sub ?? "").normalize("NFC").trim();
+  // 모델이 "상위 > 하위" 모양을 그대로 따라 쓰는 경우가 있어 마지막 조각만 하위 이름으로 본다.
+  const subName = (sub ?? "").normalize("NFC").split(">").pop()!.trim();
   if (isBlankOrUnclassified(subName)) return { topId: matchedTop.id, sub: null };
 
   const subKey = normalizeTopic(subName);

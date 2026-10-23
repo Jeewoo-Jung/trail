@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyCard, reclassifyWaiting, type Classifier } from "./classify-card";
+import { classifyCard, classifyPendingThenWaiting, reclassifyWaiting, type Classifier } from "./classify-card";
 import type { CardForClassification, ClassifyStore } from "./classify-store";
 import type { SubConceptRef, TopConceptRef } from "../rules/classification";
 
@@ -18,6 +18,7 @@ class FakeClassifyStore implements ClassifyStore {
   async listTopConcepts() { return this.tops; }
   async listSubConcepts() { return this.subs; }
   async getCard(id: string) { return this.cards.get(id) ?? null; }
+  async listPendingCardIds(limit: number) { return [...this.cards.keys()].filter((id) => this.status.get(id) === "pending").slice(0, limit); }
   async listWaitingCardIds(limit: number) { return this.waiting.filter((id) => this.status.get(id) === "waiting").slice(0, limit); }
   async createSubProposal(topId: string, name: string) {
     const found = this.subs.find((s) => s.topId === topId && s.name === name);
@@ -84,5 +85,20 @@ describe("reclassifyWaiting", () => {
     const r = await reclassifyWaiting(s, flaky);
     expect(r).toEqual({ done: 1, stillWaiting: 2 });
     expect(calls).toBe(2);
+  });
+});
+
+describe("classifyPendingThenWaiting", () => {
+  it("분류 중 카드를 분류한 뒤 대기 카드도 다시 분류한다", async () => {
+    const s = new FakeClassifyStore(); s.addCard("p"); s.addCard("w", "waiting");
+    await classifyPendingThenWaiting(s, ok({ top: "취업준비" }));
+    expect([s.status.get("p"), s.status.get("w")]).toEqual(["done", "done"]);
+  });
+  it("분류 중 카드가 대기로 밀리면(한도) 대기 카드를 또 부르지 않는다", async () => {
+    const s = new FakeClassifyStore(); s.addCard("p"); s.addCard("w", "waiting");
+    let calls = 0;
+    await classifyPendingThenWaiting(s, async () => { calls++; throw new Error("limit"); });
+    expect(calls).toBe(1);
+    expect(s.status.get("p")).toBe("waiting");
   });
 });

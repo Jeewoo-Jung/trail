@@ -10,6 +10,17 @@ function check(error: { code?: string } | null, what: string): void {
 }
 
 export function createSupabaseClassifyStore(client: SupabaseClient): ClassifyStore {
+  async function listIdsByStatus(status: "pending" | "waiting", limit: number): Promise<string[]> {
+    const { data, error } = await client
+      .from("cards")
+      .select("id")
+      .eq("classification_status", status)
+      .order("created_at", { ascending: true })
+      .limit(limit);
+    check(error, "분류 대기 카드 읽기");
+    return (data ?? []).map((r) => r.id);
+  }
+
   return {
     async listTopConcepts(): Promise<TopConceptRef[]> {
       const { data, error } = await client.from("top_concepts").select("id, name").order("sort_order").order("name");
@@ -37,15 +48,12 @@ export function createSupabaseClassifyStore(client: SupabaseClient): ClassifySto
       };
     },
 
+    async listPendingCardIds(limit: number): Promise<string[]> {
+      return listIdsByStatus("pending", limit);
+    },
+
     async listWaitingCardIds(limit: number): Promise<string[]> {
-      const { data, error } = await client
-        .from("cards")
-        .select("id")
-        .eq("classification_status", "waiting")
-        .order("created_at", { ascending: true })
-        .limit(limit);
-      check(error, "대기 카드 읽기");
-      return (data ?? []).map((r) => r.id);
+      return listIdsByStatus("waiting", limit);
     },
 
     async createSubProposal(topId: string, name: string): Promise<string> {

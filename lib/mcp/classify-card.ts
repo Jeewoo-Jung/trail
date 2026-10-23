@@ -48,3 +48,14 @@ export async function reclassifyWaiting(store: ClassifyStore, classifier: Classi
   }
   return { done, stillWaiting: 0 };
 }
+
+export const CLASSIFY_BATCH_MAX = 10;
+
+/** 기록 직후에 돌린다: "분류 중" 카드를 분류하고, 모두 성공했을 때만 대기 카드도 다시 분류한다(한도에 막혔는데 또 부르지 않기 위해). */
+export async function classifyPendingThenWaiting(store: ClassifyStore, classifier: Classifier): Promise<void> {
+  const ids = await store.listPendingCardIds(CLASSIFY_BATCH_MAX);
+  for (const id of ids) {
+    if ((await classifyCard(store, classifier, id)) === "waiting") return;
+  }
+  await reclassifyWaiting(store, classifier);
+}
