@@ -29,3 +29,35 @@ export const REQUEST_LIMITS = {
   perMinute: 30,
   perDay: 500,
 } as const;
+
+/**
+ * 노드·활동 카드의 한도(DESIGN.md §14.2, PLAN 32). 데이터베이스에도 같은 한도의 안전망이 걸려 있다(supabase/migrations/…_nodes.sql).
+ * STAR 항목별 글자 수는 읽기 좋은 길이와 카드 한 장 분량을 기준으로 정했다. 바꾸면 이 숫자와 테스트, DESIGN 14.2를 함께 고친다.
+ */
+export const NODE_LIMITS = {
+  nameMaxChars: 60,
+  descriptionMaxChars: 500,
+  /** 뿌리를 1단계로 센 최대 단계 수. 상향식 묶기로 범주가 겹겹이 쌓일 수 있어 넉넉히 둔다 */
+  maxDepth: 8,
+  /** 사용자 한 명이 가질 수 있는 노드 수(휴지통 포함) */
+  maxTotal: 1000,
+  /** 노드 하나에 붙일 수 있는 산출물 수 */
+  outputsMaxCount: 20,
+  outputNameMaxChars: 100,
+  urlMaxChars: 500,
+} as const;
+
+export const STAR_LIMITS = {
+  situation: 300,
+  task: 200,
+  action: 500,
+  result_conversation: 300,
+  result_external: 300,
+} as const;
+
+/** 항목 하나에 붙일 수 있는 근거 수와 원문 발췌 길이 */
+export const EVIDENCE_LIMITS = {
+  maxPerField: 3,
+  excerptMaxChars: 300,
+  titleMaxChars: 100,
+} as const;
