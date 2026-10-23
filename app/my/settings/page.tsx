@@ -47,7 +47,7 @@ async function SettingsForm({ searchParams }: { searchParams: SearchParams }) {
           defaultValue={blocked.join("\n")}
           className="rounded-xl border border-line bg-surface px-4 py-2.5 text-base"
         />
-        <button type="submit" className="self-start rounded-xl bg-accent-strong hover:bg-accent px-5 py-2 text-sm font-medium text-on-accent">저장</button>
+        <button type="submit" className="self-start rounded-xl bg-brand hover:brightness-110 px-5 py-2 text-sm font-medium text-on-accent">저장</button>
       </form>
 
       <div className="flex flex-col gap-1 text-sm">

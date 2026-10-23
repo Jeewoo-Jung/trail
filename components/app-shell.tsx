@@ -1,6 +1,7 @@
 "use client";
 
-// Design Ref: DESIGN.md §12 — Claude 나이트 모드처럼 왼쪽 사이드바 + 가운데 본문. 좁은 화면에서는 위쪽 줄의 메뉴 버튼으로 사이드바를 연다.
+// Design Ref: DESIGN.md §12 (Glass Iris) — 왼쪽 얇은 아이콘 레일 + 위쪽 바(이동 경로, 실시간 상태 알약, 내 메뉴) + 가운데 본문.
+// 좁은 화면에서는 레일이 위쪽 바 아래의 가로 아이콘 줄이 되고, 위쪽 바는 두 줄로 나뉜다.
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -13,85 +14,77 @@ const NAV = [
   { href: "/my/settings", label: "설정", icon: "M12 15a3 3 0 100-6 3 3 0 000 6zM19 12a7 7 0 00-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 00-2-1.2L14.2 3h-4l-.4 2.6a7 7 0 00-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 000 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 002 1.2l.4 2.6h4l.4-2.6a7 7 0 002-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z" },
 ] as const;
 
-function Icon({ d }: { d: string }) {
+function Icon({ d, size = 18 }: { d: string; size?: number }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d={d} />
     </svg>
   );
 }
 
+const isActive = (pathname: string, href: string) => (href === "/my" ? pathname === "/my" : pathname.startsWith(href));
+const tile = (active: boolean) => `grid h-9 w-9 place-items-center rounded-xl ${active ? "bg-surface-active text-fg ring-1 ring-accent/60" : "text-muted hover:bg-surface-hover hover:text-fg"}`;
+
 export function AppShell({ email, logout, children }: { email: string | null; logout: () => Promise<void>; children: React.ReactNode }) {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const current = NAV.find((n) => isActive(pathname, n.href))?.label ?? "개념 트리";
 
-  const nav = (
-    <nav aria-label="주 메뉴" className="flex flex-col gap-1">
-      {NAV.map((item) => {
-        const active = item.href === "/my" ? pathname === "/my" : pathname.startsWith(item.href);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            aria-current={active ? "page" : undefined}
-            onClick={() => setOpen(false)} // 좁은 화면에서 메뉴를 고르면 닫는다
-            className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm ${active ? "bg-surface-active text-fg" : "text-muted hover:bg-surface-hover hover:text-fg"}`}
-          >
-            <Icon d={item.icon} />
-            {item.label}
-          </Link>
-        );
-      })}
-    </nav>
-  );
-
-  const sidebar = (
-    <div className="flex h-full flex-col gap-6 p-4">
-      <Link href="/my" className="flex items-center gap-2 px-2 pt-1" aria-label="Trail 홈">
-        <span aria-hidden className="inline-block h-3 w-3 rounded-full bg-accent" />
-        <span className="font-serif text-2xl text-fg">Trail</span>
+  const links = NAV.map((item) => {
+    const active = isActive(pathname, item.href);
+    return (
+      <Link key={item.href} href={item.href} title={item.label} aria-label={item.label} aria-current={active ? "page" : undefined} className={tile(active)}>
+        <Icon d={item.icon} />
       </Link>
-      {nav}
-      <div className="flex flex-col gap-1">
-        <p className="px-3 pb-1 text-xs text-subtle">내려받기</p>
-        <a href="/api/export?format=md" download className="rounded-xl px-3 py-2 text-sm text-muted hover:bg-surface-hover hover:text-fg">Markdown (.md)</a>
-        <a href="/api/export?format=json" download className="rounded-xl px-3 py-2 text-sm text-muted hover:bg-surface-hover hover:text-fg">JSON (.json)</a>
-      </div>
-      <div className="mt-auto flex flex-col gap-3 border-t border-line pt-4">
-        <RealtimeStatus />
-        <div className="flex items-center gap-3">
-          <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface-active text-sm text-fg">
-            {(email ?? "?").slice(0, 1).toUpperCase()}
-          </span>
-          <span className="min-w-0 flex-1 truncate text-sm text-muted" title={email ?? undefined}>{email ?? "로그인함"}</span>
-        </div>
-        <form action={logout}>
-          <button type="submit" className="w-full rounded-xl border border-line px-3 py-2 text-sm text-muted hover:bg-surface-hover hover:text-fg">로그아웃</button>
-        </form>
-      </div>
-    </div>
-  );
+    );
+  });
 
   return (
-    <div className="flex min-h-screen flex-col md:flex-row">
-      {/* 좁은 화면: 위쪽 줄 */}
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-sidebar px-4 py-3 md:hidden">
-        <Link href="/my" className="flex items-center gap-2" aria-label="Trail 홈">
-          <span aria-hidden className="inline-block h-3 w-3 rounded-full bg-accent" />
-          <span className="font-serif text-xl text-fg">Trail</span>
+    <div className="flex min-h-screen">
+      {/* 넓은 화면: 왼쪽 아이콘 레일 */}
+      <aside className="sticky top-0 hidden h-screen w-14 shrink-0 flex-col items-center gap-3 border-r border-line bg-sidebar py-3 md:flex">
+        <Link href="/my" aria-label="Trail 홈" className="grid h-9 w-9 place-items-center rounded-xl bg-white">
+          <span aria-hidden className="h-3 w-3 rounded-full bg-brand" />
         </Link>
-        <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-controls="sidebar-panel" aria-label="메뉴 열기·닫기" className="rounded-xl border border-line p-2 text-muted">
-          <Icon d={open ? "M6 6l12 12M18 6L6 18" : "M4 7h16M4 12h16M4 17h16"} />
-        </button>
-      </header>
-      {open && (
-        <div id="sidebar-panel" className="fixed inset-x-0 bottom-0 top-[57px] z-20 overflow-y-auto bg-sidebar md:hidden">
-          {sidebar}
-        </div>
-      )}
-      {/* 넓은 화면: 왼쪽 고정 사이드바 */}
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-line bg-sidebar md:block">{sidebar}</aside>
-      <main className="min-w-0 flex-1">{children}</main>
+        <nav aria-label="주 메뉴" className="mt-2 flex flex-col gap-2">{links}</nav>
+      </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-sidebar/80 px-4 py-2.5 backdrop-blur md:px-6">
+          <Link href="/my" className="flex items-center gap-2 md:hidden" aria-label="Trail 홈">
+            <span aria-hidden className="inline-block h-3 w-3 rounded-full bg-brand" />
+            <span className="text-lg font-semibold text-fg">Trail</span>
+          </Link>
+          <nav aria-label="현재 위치" className="hidden items-center gap-2 text-sm text-muted md:flex">
+            <span>Home</span>
+            <span aria-hidden className="text-subtle">›</span>
+            <span className="text-fg">{current}</span>
+          </nav>
+
+          <div className="ml-auto flex items-center gap-3">
+            <div className="glass rounded-full px-3 py-1.5"><RealtimeStatus /></div>
+            <div className="relative">
+              <button type="button" onClick={() => setMenuOpen((v) => !v)} aria-expanded={menuOpen} aria-haspopup="menu" aria-label="내 메뉴" className="grid h-9 w-9 place-items-center rounded-full bg-brand text-sm font-medium text-on-accent">
+                {(email ?? "?").slice(0, 1).toUpperCase()}
+              </button>
+              {menuOpen && (
+                <div role="menu" className="glass absolute right-0 top-11 z-40 flex w-60 flex-col gap-1 rounded-2xl bg-surface/95 p-2 text-sm">
+                  <p className="truncate px-3 py-2 text-muted" title={email ?? undefined}>{email ?? "로그인함"}</p>
+                  <a role="menuitem" href="/api/export?format=md" download className="rounded-xl px-3 py-2 text-muted hover:bg-surface-hover hover:text-fg">Markdown으로 내려받기</a>
+                  <a role="menuitem" href="/api/export?format=json" download className="rounded-xl px-3 py-2 text-muted hover:bg-surface-hover hover:text-fg">JSON으로 내려받기</a>
+                  <form action={logout} className="mt-1 border-t border-line pt-1">
+                    <button type="submit" role="menuitem" className="w-full rounded-xl px-3 py-2 text-left text-muted hover:bg-surface-hover hover:text-fg">로그아웃</button>
+                  </form>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 좁은 화면: 둘째 줄에 아이콘 */}
+          <nav aria-label="주 메뉴" className="flex w-full items-center gap-2 md:hidden">{links}</nav>
+        </header>
+        <main className="min-w-0 flex-1">{children}</main>
+      </div>
     </div>
   );
 }

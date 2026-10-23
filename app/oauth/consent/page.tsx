@@ -73,7 +73,7 @@ async function Consent({ searchParams }: { searchParams: SearchParams }) {
       <div className="flex gap-3">
         <form action={approve}>
           <input type="hidden" name="authorization_id" value={id} />
-          <button type="submit" disabled={!owner} className="rounded-xl bg-accent-strong hover:bg-accent px-5 py-2 text-sm font-medium text-on-accent disabled:opacity-40">
+          <button type="submit" disabled={!owner} className="rounded-xl bg-brand hover:brightness-110 px-5 py-2 text-sm font-medium text-on-accent disabled:opacity-40">
             승인
           </button>
         </form>

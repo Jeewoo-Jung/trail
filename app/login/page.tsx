@@ -55,7 +55,7 @@ async function LoginForm({ searchParams }: { searchParams: SearchParams }) {
       )}
       <button
         type="submit"
-        className="rounded-xl bg-accent-strong px-5 py-2.5 font-medium text-on-accent transition-colors hover:bg-accent"
+        className="rounded-xl bg-brand px-5 py-2.5 font-medium text-on-accent transition-colors hover:bg-accent"
       >
         로그인
       </button>

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { createClaudeClassifier } from "@/lib/claude/classifier";
 import { ConceptTree } from "@/components/concept-tree";
+import { Orb } from "@/components/orb";
 import { loadTree } from "@/lib/my/load-tree";
 import { classifyPendingThenWaiting } from "@/lib/mcp/classify-card";
 import { createSupabaseClassifyStore } from "@/lib/mcp/supabase-classify-store";
@@ -18,7 +19,12 @@ import { approveSub, approveTreeProposal, deleteCard, rejectSub, rejectTreePropo
 export default function MyPage() {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
-      <h1 className="text-3xl">개념 트리</h1>
+      <div className="flex flex-col items-center gap-4 pb-4 pt-2 text-center">
+        <Orb />
+        <p className="text-muted">안녕하세요, 오늘도 기록을 이어 가 볼까요?</p>
+        <h1 className="text-3xl uppercase tracking-wide md:text-4xl">내 기록을 한눈에</h1>
+        <p className="max-w-md text-sm text-subtle">Claude와 나눈 대화의 결정이 개념 트리로 모입니다. 새 하위 개념은 승인해야 확정돼요.</p>
+      </div>
       <Suspense fallback={<p className="text-sm text-subtle">불러오는 중…</p>}>
         <SignedIn />
       </Suspense>
@@ -71,7 +77,7 @@ async function SignedIn() {
                 <span className="flex gap-2">
                   <form action={approveSub}>
                     <input type="hidden" name="sub_id" value={p.subId} />
-                    <button type="submit" className="rounded-xl bg-accent-strong hover:bg-accent px-4 py-1 text-xs font-medium text-on-accent">승인</button>
+                    <button type="submit" className="rounded-xl bg-brand hover:brightness-110 px-4 py-1 text-xs font-medium text-on-accent">승인</button>
                   </form>
                   <form action={rejectSub}>
                     <input type="hidden" name="sub_id" value={p.subId} />
@@ -104,7 +110,7 @@ async function SignedIn() {
                   <form action={approveTreeProposal}>
                     <input type="hidden" name="proposal_id" value={p.id} />
                     <input type="hidden" name="kind" value={p.kind} />
-                    <button type="submit" className="rounded-xl bg-accent-strong hover:bg-accent px-4 py-1 text-xs font-medium text-on-accent">승인</button>
+                    <button type="submit" className="rounded-xl bg-brand hover:brightness-110 px-4 py-1 text-xs font-medium text-on-accent">승인</button>
                   </form>
                   <form action={rejectTreeProposal}>
                     <input type="hidden" name="proposal_id" value={p.id} />

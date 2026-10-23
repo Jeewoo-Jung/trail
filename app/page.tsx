@@ -18,7 +18,7 @@ export default function Home() {
             <span aria-hidden className="inline-block h-3 w-3 rounded-full bg-accent" />
             <span className="font-serif text-2xl text-fg">Trail</span>
           </span>
-          <Link href="/login" className="rounded-xl bg-accent-strong px-4 py-2 text-sm font-medium text-on-accent hover:bg-accent">
+          <Link href="/login" className="rounded-xl bg-brand px-4 py-2 text-sm font-medium text-on-accent hover:bg-accent">
             로그인
           </Link>
         </div>

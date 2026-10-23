@@ -4,24 +4,29 @@
  * Trail 시각 디자인(DESIGN.md §12): Claude 나이트 모드의 색·글꼴·모서리·여백을 따른다.
  * 항상 어두운 테마만 쓴다(밝은 모드 없음). 색은 아래 변수 한곳에서만 정하고, 화면에서는 bg-canvas·text-muted처럼 이름으로만 쓴다.
  */
+/*
+ * Trail 시각 디자인(DESIGN.md §12) — "Glass Iris": 거의 검정인 바탕에 위에서 내리는 전기 파랑 빛, 유리 같은 면.
+ * 항상 어두운 테마만 쓴다. 색은 아래 변수 한곳에서만 정하고, 화면에서는 bg-canvas·text-muted처럼 이름으로만 쓴다.
+ */
 :root {
   color-scheme: dark;
-  --canvas: #262624; /* 본문 배경 */
-  --sidebar: #1f1e1d; /* 왼쪽 사이드바 배경 */
-  --surface: #30302e; /* 카드·입력칸 */
-  --surface-hover: #3a3a37;
-  --surface-active: #44443f;
-  --line: #3e3e3a; /* 테두리 */
-  --fg: #faf9f5; /* 기본 글자 */
-  --muted: #c2c0b6; /* 보조 글자 */
-  --subtle: #9c9a92; /* 흐린 글자 */
-  --accent: #d97757; /* 클로드 주황 */
-  --accent-strong: #c6613f; /* 주요 버튼 배경 */
+  --canvas: #0e0e0e; /* 페이지 바탕 */
+  --sidebar: #0a0a0a; /* 왼쪽 레일·상단 바 */
+  --surface: #151515; /* 카드·입력칸 */
+  --surface-hover: #1d1d1d;
+  --surface-active: #232830;
+  --line: rgba(255, 255, 255, 0.09); /* 테두리(유리처럼 옅게) */
+  --fg: #ffffff;
+  --muted: #8c8c8c; /* 보조 글자 */
+  --subtle: #6e6e6e; /* 흐린 글자 */
+  --accent: #2f6bff; /* 파랑 */
+  --accent-strong: #2f6bff;
+  --accent-violet: #5a4cf5; /* 보라 */
   --on-accent: #ffffff;
-  --danger: #ef8a80;
-  --warn: #e3b05a;
+  --danger: #ff7b7b; /* 오류·삭제(상태 표시용) */
+  --warn: #e3b05a; /* 제안·대기(상태 표시용) */
   --info: #7fb1e0;
-  --ok: #8fc78f;
+  --ok: #6fd3a0;
 }
 
 @theme inline {
@@ -36,13 +41,14 @@
   --color-subtle: var(--subtle);
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
+  --color-accent-violet: var(--accent-violet);
   --color-on-accent: var(--on-accent);
   --color-danger: var(--danger);
   --color-warn: var(--warn);
   --color-info: var(--info);
   --color-ok: var(--ok);
-  --font-sans: var(--font-inter), "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
-  --font-serif: var(--font-newsreader), "AppleMyungjo", "Noto Serif KR", "Nanum Myeongjo", serif;
+  --font-sans: var(--font-inter-tight), "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+  --font-serif: var(--font-inter-tight), "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
   --radius-xl: 0.75rem;
   --radius-2xl: 1rem;
 }
@@ -59,16 +65,51 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* 제목은 Claude처럼 세리프체, 약간 가볍게 */
 h1,
 h2 {
-  font-family: var(--font-serif);
   font-weight: 500;
   letter-spacing: -0.01em;
 }
 
+/* 위에서 내리는 빛: 가운데 파랑, 오른쪽 보라, 왼쪽 옅은 청록 */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 70vh;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 55% at 50% -8%, rgba(64, 110, 255, 0.5), transparent 70%),
+    radial-gradient(40% 45% at 72% -6%, rgba(124, 72, 240, 0.32), transparent 70%),
+    radial-gradient(35% 40% at 28% -6%, rgba(60, 200, 230, 0.14), transparent 70%);
+}
+body > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* 유리 같은 면: 반투명 + 흐림 */
+.glass {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(14px);
+}
+
+/* 파랑 → 보라 그라데이션(주요 버튼) */
+.bg-brand {
+  background-image: linear-gradient(135deg, var(--accent), var(--accent-violet));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orb-spin,
+  .orb-pulse {
+    animation: none !important;
+  }
+}
+
 ::selection {
-  background: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: rgba(47, 107, 255, 0.45);
 }
 
 :focus-visible {
@@ -91,4 +132,21 @@ textarea::placeholder {
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--surface-active) transparent;
+}
+
+@keyframes orb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes orb-pulse {
+  0%,
+  100% {
+    opacity: 0.75;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
 }

@@ -175,6 +175,6 @@ export function zoomAt(t: ViewTransform, factor: number, px: number, py: number,
   return { k, x: px - (px - t.x) * real, y: py - (py - t.y) * real };
 }
 
-/** 색: 상위 개념마다 하나씩(Claude 팔레트에 어울리는 차분한 색). */
-export const GROUP_COLORS = ["#d97757", "#7fb1e0", "#8fc78f", "#b9a0e0", "#e3b05a", "#e08fb0", "#6fc7c0", "#c9c36f"] as const;
+/** 색: 상위 개념마다 하나씩(Glass Iris 팔레트: 파랑·보라·청록 계열). */
+export const GROUP_COLORS = ["#2f6bff", "#7c48f0", "#38bdf8", "#a78bfa", "#22d3ee", "#818cf8", "#60a5fa", "#c084fc"] as const;
 export const groupColor = (group: number): string => GROUP_COLORS[group % GROUP_COLORS.length];

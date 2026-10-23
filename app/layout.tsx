@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import { Inter, Newsreader } from "next/font/google";
+import { Inter_Tight } from "next/font/google";
 import "./globals.css";
 
-// Claude 화면처럼 본문은 산세리프(Inter), 제목은 세리프(Newsreader)로 쓴다. 한글은 기기에 있는 글꼴(애플 SD 고딕·애플명조 등)로 보인다.
-const inter = Inter({ variable: "--font-inter", subsets: ["latin"], display: "swap" });
-const newsreader = Newsreader({ variable: "--font-newsreader", subsets: ["latin"], display: "swap" });
+// Glass Iris 디자인: 글꼴은 Inter Tight 하나(400·500·600). 한글은 기기에 있는 글꼴(애플 SD 고딕 등)로 보인다.
+const interTight = Inter_Tight({ variable: "--font-inter-tight", subsets: ["latin"], weight: ["400", "500", "600"], display: "swap" });
 
 export const metadata: Metadata = {
   title: "Trail",
@@ -15,7 +14,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="ko"
-      className={`${inter.variable} ${newsreader.variable} h-full antialiased`}
+      className={`${interTight.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

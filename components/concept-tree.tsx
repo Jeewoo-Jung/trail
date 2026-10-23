@@ -126,7 +126,7 @@ function NodeRow(props: {
         <div className="flex gap-2 pb-1.5 pl-6">
           <form action={props.proposal.approve}>
             <input type="hidden" name="sub_id" value={props.proposal.subId} />
-            <button type="submit" className="rounded-xl bg-accent-strong hover:bg-accent px-3 py-0.5 text-xs font-medium text-on-accent">승인</button>
+            <button type="submit" className="rounded-xl bg-brand hover:brightness-110 px-3 py-0.5 text-xs font-medium text-on-accent">승인</button>
           </form>
           <form action={props.proposal.reject}>
             <input type="hidden" name="sub_id" value={props.proposal.subId} />
