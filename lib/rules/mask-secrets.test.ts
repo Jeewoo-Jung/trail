@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkCard, type CheckedCard } from "./card";
-import { MASK, maskCard, maskSecrets } from "./mask-secrets";
+import { MASK, maskSecrets } from "./mask-secrets";
 
 // 가짜 키는 실행할 때 조립한다. 소스에 키 모양 글자가 그대로 남지 않게 하려는 것이다.
 const NOISE = "aB3dE5fG7hJ9kL2mN4pQ6rS8tU1vW0xY";
@@ -9,17 +8,6 @@ const fake = (prefix: string, length: number) =>
 
 const fakeJwt = () => [fake("eyJ", 30), fake("eyJ", 40), NOISE].join(".");
 
-function makeCard(overrides: Record<string, unknown> = {}): CheckedCard {
-  const result = checkCard({
-    topicKey: "키-테스트",
-    title: "제목",
-    summary: "요약이다.",
-    evidence: ["근거"],
-    ...overrides,
-  });
-  if (!result.ok) throw new Error(`카드가 거절됨: ${JSON.stringify(result.issues)}`);
-  return result.card;
-}
 
 describe("가려야 하는 것", () => {
   it.each([
@@ -109,73 +97,6 @@ describe("건드리면 안 되는 것 (지나치게 가리지 않기)", () => {
   });
 });
 
-describe("카드 전체 가리기", () => {
-  it("글 칸마다 가리고, 몇 곳을 가렸는지 센다", () => {
-    const key = fake("sk-", 40);
-    const card = makeCard({
-      title: `키 ${key} 정리`,
-      summary: `요약에도 ${fake("ghp_", 36)} 가 있다.`,
-      keywords: [`k-${fake("vcp_", 40)}`, "정상"],
-      evidence: [`근거 ${key}`, "정상 근거"],
-      candidates: [{ path: ["연구", `이름 ${fake("sbp_", 20)}`], isNew: false }],
-      projectTopic: `주제 ${key}`,
-    });
-    const { card: masked, maskedCount } = maskCard(card);
-
-    expect(maskedCount).toBe(6);
-    const everything = JSON.stringify(masked);
-    expect(everything).not.toContain(key);
-    expect(everything).not.toContain("ghp_");
-    expect(everything).not.toContain("sbp_");
-    expect(everything).not.toContain("vcp_");
-    expect(masked.title).toBe(`키 ${MASK} 정리`);
-    expect(masked.evidence[1]).toBe("정상 근거");
-    expect(masked.keywords).toContain("정상");
-  });
-
-  it("비밀값이 없으면 카드를 그대로 두고 알림도 붙이지 않는다", () => {
-    const card = makeCard();
-    const { card: masked, maskedCount } = maskCard(card);
-    expect(maskedCount).toBe(0);
-    expect(masked).toEqual(card);
-    expect(masked.notes).toEqual([]);
-  });
-
-  it("가렸다는 알림은 붙이되 알림에 비밀값은 넣지 않는다", () => {
-    const key = fake("sk-", 40);
-    const { card: masked } = maskCard(makeCard({ summary: `키는 ${key}` }));
-    expect(masked.notes).toHaveLength(1);
-    expect(masked.notes[0]).toContain("1곳");
-    expect(masked.notes[0]).not.toContain(key);
-  });
-
-  it("카드 id는 건드리지 않는다", () => {
-    const { card: masked } = maskCard(makeCard({ cardId: "card-123" }));
-    expect(masked.cardId).toBe("card-123");
-  });
-
-  it("(추정) 문장 안의 비밀값이 추정 목록으로 새지 않는다", () => {
-    const key = fake("sk-", 40);
-    const { card: masked } = maskCard(makeCard({ summary: `이 키 ${key} 가 쓰였을 것이다 (추정).` }));
-    expect(masked.estimates).toEqual([`이 키 ${MASK} 가 쓰였을 것이다 (추정)`]);
-    expect(JSON.stringify(masked)).not.toContain(key);
-  });
-
-  it("가린 뒤 같아진 개념어는 하나로 합친다", () => {
-    const { card: masked } = maskCard(makeCard({ keywords: [fake("sk-", 40), fake("sk-", 50), "정상"] }));
-    expect(masked.keywords).toEqual([MASK, "정상"]);
-  });
-
-  it("원래 카드는 바꾸지 않는다", () => {
-    const key = fake("sk-", 40);
-    const card = makeCard({ summary: `키 ${key}` });
-    maskCard(card);
-    expect(card.summary).toContain(key);
-    expect(card.notes).toEqual([]);
-  });
-});
-
-// 가짜 키는 실행할 때 조립해서, 소스에 키 모양 글자가 그대로 남지 않게 한다.
 describe("maskSecrets: 추가한 모양", () => {
   const rnd = "aB3dE5fG7hJ9kL2mN4pQ6rS8tU1vW";
   const cases: [string, string][] = [

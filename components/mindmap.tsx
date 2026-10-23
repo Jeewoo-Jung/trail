@@ -1,19 +1,22 @@
 "use client";
 
-// Design Ref: DESIGN.md §12 — 옵시디언 그래프 보기를 따른다: 어두운 바탕에 회색 점과 가는 선, 점마다 힘으로 자리 잡기,
+// Design Ref: DESIGN.md §14.5(마인드맵은 보조 화면) — 옵시디언 그래프 보기를 따른다: 어두운 바탕에 회색 점과 가는 선, 점마다 힘으로 자리 잡기,
 // 끌어서 이동·휠로 확대·점 끌기, 마우스를 올리면 그 점과 이웃만 밝히기, 검색, 라벨 보이기 조절.
-// 읽기 전용이다. 노드를 누르면 트리 화면과 같은 카드 상세가 옆에 보이고, 승인·거절·삭제는 트리 화면에서만 한다.
+// 읽기 전용 보조 화면이다. 노드를 누르면 요약이 옆에 보이고, 고치기·옮기기·삭제는 트리 화면에서 한다.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CardItem } from "@/components/concept-tree";
-import { buildGraph, defaultCollapsedGraph, fitTransform, groupColor, neighborsOf, tickGraph, zoomAt, type Graph, type ViewTransform } from "@/lib/rules/graph-layout";
-import { cardsOfNode, findNode, type ConceptNode } from "@/lib/rules/tree";
+import Link from "next/link";
+import { buildGraph, defaultCollapsedGraph, fitTransform, groupColor, neighborsOf, tickGraph, zoomAt, type Graph, type GraphSource, type ViewTransform } from "@/lib/rules/graph-layout";
+import { Badge } from "@/components/ui";
 
 // 화면 크기를 재기 전(첫 그림)에 쓰는 기본 크기. 실제 크기는 ResizeObserver가 잰다.
 const DEFAULT_W = 900;
 const DEFAULT_H = 640;
 type LabelMode = "auto" | "always" | "off";
 
-export function Mindmap({ tree }: { tree: ConceptNode[] }) {
+/** 노드를 눌렀을 때 옆에 보여 줄 요약(서버가 만들어 넘긴다) */
+export type MindmapInfo = { name: string; kindLabel: string; path: string; period: string; description: string; fields: { label: string; text: string }[]; docHref: string | null };
+
+export function Mindmap({ tree, info }: { tree: GraphSource[]; info: Record<string, MindmapInfo> }) {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => defaultCollapsedGraph(tree));
   const [selected, setSelected] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
@@ -152,10 +155,11 @@ export function Mindmap({ tree }: { tree: ConceptNode[] }) {
       return next;
     });
 
-  const cards = cardsOfNode(tree, selected);
   const selectedNode = graph.nodes.find((n) => n.id === selected);
-  // 자식이 있는 개념을 고르면 접기/펼치기 버튼을 보여 준다(어느 단계든 접을 수 있다).
-  const foldable = selected ? findNode(tree, selected) : null;
+  const detail = selected ? info[selected] : undefined;
+  // 자식이 있는 노드를 고르면 접기/펼치기 버튼을 보여 준다(어느 단계든 접을 수 있다).
+  const flat = (list: GraphSource[]): GraphSource[] => list.flatMap((n) => [n, ...flat(n.children)]);
+  const foldable = selected ? flat(tree).find((n) => n.key === selected) : null;
   const selectedTop = foldable && foldable.children.length > 0 ? foldable : null;
   const showLabel = (id: string) => {
     if (labels === "off") return false;
@@ -170,7 +174,7 @@ export function Mindmap({ tree }: { tree: ConceptNode[] }) {
           ref={svgRef}
           viewBox={`0 0 ${size.w} ${size.h}`}
           role="group"
-          aria-label="개념 그래프"
+          aria-label="노드 그래프"
           className="block h-[70vh] min-h-[420px] w-full touch-none select-none"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -196,7 +200,7 @@ export function Mindmap({ tree }: { tree: ConceptNode[] }) {
                   data-node={n.id}
                   role="button"
                   tabIndex={0}
-                  aria-label={`${n.label} ${n.count}장${n.proposed ? " (제안)" : ""}${n.hidden ? ` 하위 ${n.hidden}개 접힘` : ""}`}
+                  aria-label={`${n.label} 활동 ${n.count}개${n.excluded ? " (제외)" : ""}${n.hidden ? ` 하위 ${n.hidden}개 접힘` : ""}`}
                   aria-pressed={isSel}
                   onPointerEnter={() => setHover(n.id)}
                   onPointerLeave={() => setHover(null)}
@@ -209,10 +213,10 @@ export function Mindmap({ tree }: { tree: ConceptNode[] }) {
                   <circle cx={n.x} cy={n.y} r={n.r + 8} fill="transparent" />
                   <circle
                     cx={n.x} cy={n.y} r={n.r}
-                    fill={n.proposed ? "none" : color}
-                    stroke={isSel ? "#f5f5f7" : n.proposed ? "#ff9f0a" : "none"}
+                    fill={n.excluded ? "none" : color}
+                    stroke={isSel ? "#f5f5f7" : n.excluded ? "#ff9f0a" : "none"}
                     strokeWidth={(isSel ? 2.4 : 1.8) / view.k + 0.2}
-                    strokeDasharray={n.proposed && !isSel ? "3 2" : undefined}
+                    strokeDasharray={n.excluded && !isSel ? "3 2" : undefined}
                   />
                   {n.hidden > 0 && <circle cx={n.x} cy={n.y} r={n.r + 4} fill="none" stroke={color} strokeOpacity={0.5} strokeDasharray="2 3" strokeWidth={1 / view.k + 0.3} />}
                   {showLabel(n.id) && (
@@ -243,8 +247,8 @@ export function Mindmap({ tree }: { tree: ConceptNode[] }) {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="개념 검색…"
-            aria-label="개념 검색"
+            placeholder="노드 검색…"
+            aria-label="노드 검색"
             className="rounded-lg border border-line px-2.5 py-1.5 text-sm"
           />
           <label className="flex items-center justify-between gap-2 text-muted">
@@ -264,16 +268,31 @@ export function Mindmap({ tree }: { tree: ConceptNode[] }) {
         <p className="pointer-events-none absolute bottom-3 left-4 text-xs text-subtle">드래그: 이동 · 휠: 확대·축소 · 점을 끌거나 눌러 보세요</p>
       </div>
 
-      <section aria-label="선택한 개념의 카드" className="flex flex-col gap-3">
+      <section aria-label="선택한 노드 요약" className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-xl">{selectedNode?.label ?? "전체"}</h2>
+          <h2 className="text-xl">{detail?.name ?? selectedNode?.label ?? "노드를 눌러 보세요"}</h2>
           {selectedTop && (
             <button type="button" onClick={() => toggleFold(selectedTop.key)} className="rounded-full border border-line px-3 py-1 text-xs text-muted hover:bg-surface-hover">
-              {collapsed.has(selectedTop.key) ? "하위 개념 펼치기" : "하위 개념 접기"}
+              {collapsed.has(selectedTop.key) ? "하위 노드 펼치기" : "하위 노드 접기"}
             </button>
           )}
         </div>
-        {cards.length === 0 ? <p className="text-sm text-subtle">이 개념에는 카드가 없습니다.</p> : cards.map((card) => <CardItem key={card.id} card={card} />)}
+        {detail ? (
+          <div className="flex flex-col gap-3 text-sm">
+            <p className="text-xs text-subtle">{detail.path}</p>
+            <p className="flex flex-wrap items-center gap-2"><Badge>{detail.kindLabel}</Badge>{detail.period && <span className="text-muted">{detail.period}</span>}</p>
+            {detail.description && <p className="whitespace-pre-wrap text-muted">{detail.description}</p>}
+            {detail.fields.map((f) => (
+              <p key={f.label}><span className="text-muted">{f.label}</span><br />{f.text}</p>
+            ))}
+            <p className="flex flex-wrap gap-3">
+              <Link href="/my" className="text-accent hover:underline">트리에서 고치기</Link>
+              {detail.docHref && <Link href={detail.docHref} className="text-accent hover:underline">문서로 보기</Link>}
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-subtle">점을 누르면 이름·기간·STAR 요약이 여기에 보입니다. 같은 색의 점은 같은 맨 위 노드 아래에 있습니다. 점선 테두리는 제외된 노드입니다.</p>
+        )}
       </section>
     </div>
   );

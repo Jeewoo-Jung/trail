@@ -1,18 +1,18 @@
 "use client";
 
-// Design Ref: DESIGN.md §12 (Glass Iris) — 왼쪽 얇은 아이콘 레일 + 위쪽 바(이동 경로, 실시간 상태 알약, 내 메뉴) + 가운데 본문.
+// Design Ref: DESIGN.md §13 — 왼쪽 얇은 아이콘 레일 + 위쪽 바(이동 경로, 실시간 상태 알약, 내 메뉴) + 가운데 본문.
 // 좁은 화면에서는 레일이 위쪽 바 아래의 가로 아이콘 줄이 되고, 위쪽 바는 두 줄로 나뉜다.
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Download, Network, Settings, TreeDeciduous, type LucideIcon } from "lucide-react";
+import { FileText, Network, Settings, TreeDeciduous, type LucideIcon } from "lucide-react";
 import { RealtimeStatus } from "@/components/realtime-status";
 import { TrailMark } from "@/components/trail-mark";
 
 const NAV: { href: string; label: string; icon: LucideIcon }[] = [
-  { href: "/my", label: "개념 트리", icon: TreeDeciduous },
-  { href: "/my/mindmap", label: "그래프", icon: Network },
-  { href: "/my/import", label: "대화로 추천받기", icon: Download },
+  { href: "/my", label: "내 기록", icon: TreeDeciduous },
+  { href: "/my/documents", label: "STAR 문서", icon: FileText },
+  { href: "/my/mindmap", label: "마인드맵", icon: Network },
   { href: "/my/settings", label: "설정", icon: Settings },
 ];
 
@@ -22,7 +22,7 @@ const tile = (active: boolean) => `grid h-9 w-9 place-items-center rounded-xl ${
 export function AppShell({ email, logout, children }: { email: string | null; logout: () => Promise<void>; children: React.ReactNode }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
-  const current = NAV.find((n) => isActive(pathname, n.href))?.label ?? "개념 트리";
+  const current = NAV.find((n) => isActive(pathname, n.href))?.label ?? "내 기록";
 
   const links = NAV.map((item) => {
     const active = isActive(pathname, item.href);
@@ -64,8 +64,6 @@ export function AppShell({ email, logout, children }: { email: string | null; lo
               {menuOpen && (
                 <div role="menu" className="glass absolute right-0 top-11 z-40 flex w-60 flex-col gap-1 rounded-2xl bg-surface/95 p-2 text-sm">
                   <p className="truncate px-3 py-2 text-muted" title={email ?? undefined}>{email ?? "로그인함"}</p>
-                  <a role="menuitem" href="/api/export?format=md" download className="rounded-xl px-3 py-2 text-muted hover:bg-surface-hover hover:text-fg">Markdown으로 내려받기</a>
-                  <a role="menuitem" href="/api/export?format=json" download className="rounded-xl px-3 py-2 text-muted hover:bg-surface-hover hover:text-fg">JSON으로 내려받기</a>
                   <form action={logout} className="mt-1 border-t border-line pt-1">
                     <button type="submit" role="menuitem" className="w-full rounded-xl px-3 py-2 text-left text-muted hover:bg-surface-hover hover:text-fg">로그아웃</button>
                   </form>

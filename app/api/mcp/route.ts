@@ -1,21 +1,18 @@
-// Design Ref: DESIGN.md §4.1, §6.1 — Claude 커스텀 커넥터가 호출하는 원격 MCP 접수 창구. 도구는 list_cards, record_cards, get_record_rules 세 개다.
+// Design Ref: DESIGN.md §14.4 — Claude 커스텀 커넥터가 호출하는 원격 MCP 접수 창구. 도구는 list_cards(이어붙일 활동·위치·결과 대기 조회), record_cards(활동 기록·병합), record_result(결과 저장), get_record_rules 네 개다.
 // 흐름: 크기 제한 → 토큰 확인(서명 + 내 계정) → 호출 횟수 → 도구 실행. 로그에는 종류·코드만 남기고 카드 내용은 남기지 않는다.
 import { createClient } from "@supabase/supabase-js";
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
-import { after } from "next/server";
 import { z } from "zod";
-import { createClaudeClassifier } from "@/lib/claude/classifier";
 import { limitRequestBody } from "@/lib/mcp/body-limit";
-import { classifyPendingThenWaiting, type Classifier } from "@/lib/mcp/classify-card";
-import { listCards } from "@/lib/mcp/list-cards";
+import { listActivities } from "@/lib/mcp/list-activities";
 import { loadRecordRules } from "@/lib/mcp/record-rules";
 import { verifyOwnerToken } from "@/lib/mcp/owner-auth";
 import { guardRequest } from "@/lib/mcp/rate-guard";
-import { recordCards } from "@/lib/mcp/record-cards";
-import { createSupabaseClassifyStore } from "@/lib/mcp/supabase-classify-store";
+import { recordActivities } from "@/lib/mcp/record-activities";
+import { recordResult } from "@/lib/mcp/record-result";
 import { createSupabaseRateStore } from "@/lib/mcp/supabase-rate-store";
-import { createSupabaseCardStore } from "@/lib/mcp/supabase-store";
-import { StoreError } from "@/lib/mcp/store";
+import { createSupabaseNodeStore } from "@/lib/mcp/supabase-node-store";
+import { StoreError } from "@/lib/mcp/errors";
 import { supabaseEnv } from "@/lib/supabase/env";
 
 /** 로그인한 사람의 토큰을 그대로 실어 보내는 연결: 데이터 접근에 "내 행만" 규칙(RLS)이 걸린다. */
@@ -37,15 +34,30 @@ function describeFailure(error: unknown): string {
   return "처리하지 못했습니다. 잠시 뒤 한 번만 다시 시도해 주세요.";
 }
 
-const cardShape = z.looseObject({
-  topicKey: z.unknown().describe("문자열. 이 주제를 가리키는 짧은 이름. 같은 대화에서 같은 주제를 다시 보내면 같은 카드를 갱신한다."),
-  title: z.unknown().describe("문자열. 카드 제목."),
-  summary: z.unknown().optional().describe("문자열, 500자 이하. 근거로 확인되지 않는 문장 끝에는 (추정)을 붙인다. 근거가 없으면 비워 둔다."),
-  keywords: z.unknown().optional().describe("문자열 배열, 최대 7개."),
-  evidence: z.unknown().optional().describe("문자열 배열, 최대 3개, 각 300자 이하. 요약의 근거가 되는 발췌."),
-  candidates: z.unknown().optional().describe("최대 3개의 분류 후보 {path: [상위 개념, 하위 개념, …], isNew}. path는 list_cards의 concepts처럼 뿌리부터 내려가는 개념 이름 목록(최대 5단계, 각 30자 이하)이다. 맞는 개념이 없으면 새 이름을 이어 붙이거나 새 상위 개념부터 시작해도 되고, 새 개념이 있으면 isNew를 true로 한다."),
-  cardId: z.unknown().optional().describe("문자열. list_cards로 얻은 카드 id. 그 카드를 갱신할 때만 쓴다."),
-  projectTopic: z.unknown().optional().describe("문자열. 프로젝트 주제."),
+const evidenceShape = z.object({
+  conversationTitle: z.string().describe("근거가 된 대화의 제목."),
+  conversationDate: z.string().describe("그 대화 날짜(YYYY-MM-DD)."),
+  excerpt: z.string().describe("원문 발췌, 300자 이하. 사용자가 실제로 한 말이나 대화에 실제로 있던 내용만 옮긴다."),
+});
+const fieldShape = z.object({
+  text: z.string().describe("항목 내용. 근거(evidence)로 직접 확인되는 내용만 쓴다."),
+  subject: z.enum(["did", "plan", "claude_unconfirmed", "estimate"]).describe("주체: did=내가 한 일, plan=내 계획, claude_unconfirmed=Claude가 제안했고 사용자가 채택했는지 확인 안 됨, estimate=추정."),
+  evidence: z.array(evidenceShape).max(3).optional().describe("이 항목의 근거(최대 3개). 근거가 없으면 이 항목은 보내지 않는다(앱이 비워 둔다)."),
+});
+const activityShape = z.looseObject({
+  nodeId: z.string().optional().describe("기존 활동에 이어붙일 때 list_cards의 activities[].id. 새 활동이면 비운다."),
+  name: z.string().optional().describe("새 활동일 때 활동 이름(60자 이하)."),
+  kind: z.enum(["activity", "subactivity", "study"]).optional().describe("새 노드의 종류. 기본 activity. subactivity는 parentId가 활동이어야 한다."),
+  description: z.string().optional().describe("새 활동의 한두 줄 설명(500자 이하)."),
+  startDate: z.string().optional().describe("시작일 YYYY-MM-DD."),
+  endDate: z.string().optional().describe("종료일 YYYY-MM-DD."),
+  parentId: z.string().optional().describe("새 활동을 둘 위치: list_cards의 places[].id."),
+  projectName: z.string().optional().describe("새 활동을 둘 프로젝트 이름. parentId가 없을 때만 쓴다. 같은 이름의 프로젝트가 있으면 그 아래에, 없으면 새로 만든다."),
+  fields: z
+    .object({ situation: fieldShape.optional(), task: fieldShape.optional(), action: fieldShape.optional(), result_conversation: fieldShape.optional() })
+    .optional()
+    .describe("STAR 항목. situation=상황(300자), task=과제(200자), action=내가 한 일(500자), result_conversation=결과 중 대화에서 얻은 것(300자). 외부 결과는 보내지 않는다(사용자가 직접 입력)."),
+  outputs: z.array(z.object({ name: z.string(), url: z.string().optional() })).max(5).optional().describe("산출물(이름, 선택적으로 http(s) 링크)."),
 });
 
 const handler = createMcpHandler(
@@ -53,8 +65,8 @@ const handler = createMcpHandler(
     server.registerTool(
       "list_cards",
       {
-        title: "이 대화의 카드 조회",
-        description: "기록하기 전에 먼저 부른다. 이 대화에 이미 있는 카드(id·주제 키·제목), 지금 있는 개념 트리의 경로 목록(concepts), 제외 주제 목록, 프로젝트 주제 목록을 돌려준다.",
+        title: "이어붙일 활동·위치 조회",
+        description: "기록하기 전에 먼저 부른다. 기존 활동 목록(activities: id·경로·기간·채워진 항목·잠긴 항목), 새 활동을 둘 수 있는 위치(places), 이 대화에서 질문한 횟수(questionCount)와 이미 질문한 주제(askedTopics), 결과가 비어 있는 활동(resultsPending: askedBefore가 true이면 이미 물은 활동이라 다시 묻지 않는다)을 돌려준다. 내용(요약·근거)은 돌려주지 않는다.",
         inputSchema: z.object({ conversationKey: z.string().optional().describe("대화 키. 처음 기록하는 대화면 비운다.") }),
       },
       async (input, ctx) => {
@@ -64,7 +76,7 @@ const handler = createMcpHandler(
           const client = clientFor(token);
           const guard = await guardRequest(createSupabaseRateStore(client), 0);
           if (!guard.ok) return text(guard.message, true);
-          const outcome = await listCards(createSupabaseCardStore(client), input);
+          const outcome = await listActivities(createSupabaseNodeStore(client), input);
           return outcome.ok ? text(outcome.output) : text(outcome.errors.join(" / "), true);
         } catch (error) {
           return text(describeFailure(error), true);
@@ -96,14 +108,14 @@ const handler = createMcpHandler(
     server.registerTool(
       "record_cards",
       {
-        title: "카드 기록·갱신",
+        title: "활동 기록·병합",
         description:
-          "결정이나 결론이 나온 내용을 카드로 기록하거나 갱신한다. 한 번에 여러 장을 보낼 수 있다. 처음 기록하면 대화 키가 발급되니 같은 대화에서는 그 키를 계속 쓴다. 비밀번호·키 같은 비밀값은 보내지 않는다.",
+          "사용자가 기록하기로 한 내용을 활동 카드(STAR)로 기록한다. 기존 활동에 이어붙이려면 nodeId를, 새 활동이면 name(과 위치)을 보낸다. 사용자가 고친(잠긴) 항목은 앱이 건드리지 않고 제안으로 따로 쌓는다. 근거가 없는 항목은 보내지 않는다. 처음 기록하면 대화 키가 발급되니 같은 대화에서는 그 키를 계속 쓴다. 비밀번호·키 같은 비밀값은 보내지 않는다.",
         inputSchema: z.object({
           conversationKey: z.string().optional().describe("대화 키. 처음이면 비운다."),
-          questionCount: z.number().optional().describe("이번 대화에서 기록 여부를 확인하려고 질문한 횟수(0 이상 정수)."),
-          excludeTopics: z.array(z.string()).optional().describe("사용자가 '이 주제는 항상 제외'를 고른 주제 이름들."),
-          cards: z.array(cardShape).describe("기록할 카드들."),
+          questionCount: z.number().optional().describe("이번 대화에서 기록 여부를 물은 횟수(0~3)."),
+          topicKey: z.string().optional().describe("방금 기록 여부를 물은 주제 이름. 주제당 1회만 묻는다."),
+          activities: z.array(activityShape).describe("기록할 활동들(한 번에 최대 5개)."),
         }),
       },
       async (input, ctx) => {
@@ -113,24 +125,37 @@ const handler = createMcpHandler(
           const client = clientFor(token);
           const guard = await guardRequest(createSupabaseRateStore(client), 0);
           if (!guard.ok) return text(guard.message, true);
-          const outcome = await recordCards(createSupabaseCardStore(client), input);
-          if (!outcome.ok) return text(outcome.errors.join(" / "), true);
+          const outcome = await recordActivities(createSupabaseNodeStore(client), input);
+          return outcome.ok ? text(outcome.output) : text(outcome.errors.join(" / "), true);
+        } catch (error) {
+          return text(describeFailure(error), true);
+        }
+      },
+    );
 
-          // 응답은 먼저 돌려주고, 분류(Claude API)는 그 뒤에 이어서 한다. 실패하면 카드는 "미분류(대기)"로 남는다.
-          after(async () => {
-            try {
-              const apiKey = process.env.ANTHROPIC_API_KEY;
-              const classifier: Classifier = apiKey
-                ? createClaudeClassifier(apiKey)
-                : async () => {
-                    throw new Error("ANTHROPIC_API_KEY 없음");
-                  };
-              await classifyPendingThenWaiting(createSupabaseClassifyStore(client), classifier);
-            } catch (error) {
-              console.error("[mcp] 분류 후처리 실패", error instanceof StoreError ? { message: error.message } : { kind: "unknown" });
-            }
-          });
-          return text(outcome.output);
+    server.registerTool(
+      "record_result",
+      {
+        title: "활동 결과 저장",
+        description:
+          "사용자가 말한 활동의 결과(합격·평가 등 외부 결과)와 최종 산출물을 그 활동에 저장한다. action=save는 사용자가 실제로 말한 내용만 text·outputs에 담아 보낸다(지어내지 않는다). action=not_applicable은 사용자가 결과가 없다고 한 활동을 더 묻지 않게 한다. action=asked는 이 활동의 결과를 방금 사용자에게 물었다는 표시이며 활동당 한 번만 묻는다. 앱 화면에서 입력한 것과 같은 데이터가 갱신된다.",
+        inputSchema: z.object({
+          nodeId: z.string().describe("결과를 저장할 활동의 id(list_cards의 resultsPending[].id). 세부활동 id는 받지 않는다."),
+          conversationKey: z.string().optional().describe("이 대화의 키(제안을 남길 때 출처로 기록한다)."),
+          action: z.enum(["save", "not_applicable", "asked"]).describe("save=결과 저장, not_applicable=해당 없음, asked=결과를 물었다는 표시."),
+          text: z.string().optional().describe("save일 때 사용자가 말한 외부 결과(300자 이하)."),
+          outputs: z.array(z.object({ name: z.string(), url: z.string().optional() })).max(5).optional().describe("save일 때 사용자가 말한 최종 산출물(이름, 선택적으로 http(s) 링크)."),
+        }),
+      },
+      async (input, ctx) => {
+        const token = ctx.http?.authInfo?.token;
+        if (!token) return text("인증 정보가 없습니다.", true);
+        try {
+          const client = clientFor(token);
+          const guard = await guardRequest(createSupabaseRateStore(client), 0);
+          if (!guard.ok) return text(guard.message, true);
+          const outcome = await recordResult(createSupabaseNodeStore(client), input);
+          return outcome.ok ? text(outcome.output) : text(outcome.errors.join(" / "), true);
         } catch (error) {
           return text(describeFailure(error), true);
         }

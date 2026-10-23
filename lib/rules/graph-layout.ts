@@ -1,8 +1,21 @@
-// Design Ref: DESIGN.md §12 — 옵시디언 그래프 보기처럼 점들이 서로 밀어내고 선이 당기는 힘으로 자리를 잡는 배치.
+// Design Ref: DESIGN.md §14.5(마인드맵은 보조 화면) — 옵시디언 그래프 보기처럼 점들이 서로 밀어내고 선이 당기는 힘으로 자리를 잡는 배치.
 // 화면(components/mindmap.tsx)이 이 계산을 매 프레임 돌리고, 계산 자체는 화면과 무관하게 시험할 수 있도록 여기에 둔다.
-import type { ConceptNode } from "./tree";
+import { hasStar } from "./nodes";
+import type { TreeNode } from "./node-tree";
 
-/** 접는 기준. 한 개념의 자식이 이보다 많거나, 전체 점이 이보다 많으면 일부를 처음부터 접어 둔다. */
+/** 그래프가 읽는 트리 모양. 노드 트리(TreeNode)에서 toGraphSource로 만든다. */
+export type GraphSource = { key: string; name: string; depth: number; /** 아래(포함)의 활동·세부활동 수 */ count: number; /** 제외(조상 포함) 상태 */ excluded: boolean; children: GraphSource[] };
+
+/** 노드 트리를 그래프 입력으로 바꾼다. 점의 크기는 아래에 있는 활동 수를 따른다. */
+export function toGraphSource(roots: readonly TreeNode[]): GraphSource[] {
+  const conv = (n: TreeNode): GraphSource => {
+    const children = n.children.map(conv);
+    return { key: n.id, name: n.name, depth: n.depth, count: (hasStar(n.kind) ? 1 : 0) + children.reduce((sum, c) => sum + c.count, 0), excluded: n.effectiveExcluded, children };
+  };
+  return roots.map(conv);
+}
+
+/** 접는 기준. 한 노드의 자식이 이보다 많거나, 전체 점이 이보다 많으면 일부를 처음부터 접어 둔다. */
 export const FOLD_CHILDREN = 8;
 export const FOLD_TOTAL_NODES = 40;
 export const FOLD_ALL_NODES = 120;
@@ -12,15 +25,16 @@ export type GraphNode = {
   /** 트리 화면과 같은 키 */
   key: string;
   label: string;
-  /** 뿌리(상위 개념)는 top, 그 아래는 모두 sub */
+  /** 뿌리(맨 위 노드)는 top, 그 아래는 모두 sub */
   kind: "top" | "sub";
   /** 뿌리가 1 */
   depth: number;
   /** 뿌리의 순번. 같은 뿌리 아래의 점은 같은 색으로 보인다 */
   group: number;
   count: number;
-  proposed: boolean;
-  /** 접혀서 숨겨진 하위 개념 수(그 아래 전부) */
+  /** 제외 상태(점선·흐리게 그린다) */
+  excluded: boolean;
+  /** 접혀서 숨겨진 하위 노드 수(그 아래 전부) */
   hidden: number;
   r: number;
   x: number;
@@ -53,11 +67,11 @@ function wobble(index: number): number {
   return x - Math.floor(x) - 0.5;
 }
 
-const countAll = (n: ConceptNode): number => n.children.reduce((s, k) => s + 1 + countAll(k), 0);
-const allNodes = (tree: readonly ConceptNode[]): ConceptNode[] => tree.flatMap((n) => [n, ...allNodes(n.children)]);
+const countAll = (n: GraphSource): number => n.children.reduce((s, k) => s + 1 + countAll(k), 0);
+const allNodes = (tree: readonly GraphSource[]): GraphSource[] => tree.flatMap((n) => [n, ...allNodes(n.children)]);
 
 /** 처음에 접어 둘 개념. 점이 많아질수록 더 많이 접는다. */
-export function defaultCollapsedGraph(tree: readonly ConceptNode[]): Set<string> {
+export function defaultCollapsedGraph(tree: readonly GraphSource[]): Set<string> {
   const nodes = allNodes(tree);
   const total = nodes.length;
   return new Set(
@@ -69,18 +83,18 @@ export function defaultCollapsedGraph(tree: readonly ConceptNode[]): Set<string>
 }
 
 /** 트리에서 점과 선을 만든다. previous가 있으면 같은 점은 있던 자리에서 이어 간다. */
-export function buildGraph(tree: readonly ConceptNode[], collapsed: ReadonlySet<string>, previous?: ReadonlyMap<string, { x: number; y: number }>): Graph {
+export function buildGraph(tree: readonly GraphSource[], collapsed: ReadonlySet<string>, previous?: ReadonlyMap<string, { x: number; y: number }>): Graph {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
   const ring = Math.max(1, tree.length);
   let counter = 0;
 
-  const place = (node: ConceptNode, group: number, x: number, y: number, outward: number, parentKey: string | null) => {
+  const place = (node: GraphSource, group: number, x: number, y: number, outward: number, parentKey: string | null) => {
     const isCollapsed = node.children.length > 0 && collapsed.has(node.key);
     const prev = previous?.get(node.key);
     nodes.push({
       id: node.key, key: node.key, label: node.name, kind: node.depth === 1 ? "top" : "sub", depth: node.depth, group, count: node.count,
-      proposed: node.proposed, hidden: isCollapsed ? countAll(node) : 0, r: nodeRadius(node.depth, node.count),
+      excluded: node.excluded, hidden: isCollapsed ? countAll(node) : 0, r: nodeRadius(node.depth, node.count),
       x: prev?.x ?? x, y: prev?.y ?? y, vx: 0, vy: 0, pinned: false,
     });
     if (parentKey) edges.push({ source: parentKey, target: node.key });
@@ -125,7 +139,14 @@ export function tickGraph(graph: Graph, alpha: number): number {
       const minDist = a.r + b.r + COLLIDE_PADDING;
       if (d < minDist) {
         const shove = ((minDist - d) / d) * 0.5;
-        a.x -= dx * shove * 0.5; a.y -= dy * shove * 0.5; b.x += dx * shove * 0.5; b.y += dy * shove * 0.5;
+        // 고정한 점은 밀리지 않는다. 한쪽만 고정이면 반대쪽이 전부 비켜 준다.
+        const wa = a.pinned ? 0 : 1;
+        const wb = b.pinned ? 0 : 1;
+        if (wa + wb > 0) {
+          const fa = (wa / (wa + wb)) * shove;
+          const fb = (wb / (wa + wb)) * shove;
+          a.x -= dx * fa; a.y -= dy * fa; b.x += dx * fb; b.y += dy * fb;
+        }
       }
     }
   }
