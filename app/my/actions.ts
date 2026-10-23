@@ -88,9 +88,11 @@ export async function resolveSuggestionAction(suggestionId: string, mode: string
 }
 
 // ───── 산출물 ─────
-const outputInput = z.object({ name: z.string().max(300), url: z.string().max(1000).optional(), isFinal: z.boolean().optional() });
-export async function addOutputAction(nodeId: string, output: { name: string; url?: string; isFinal?: boolean }): Promise<EditResult> {
-  return guard(z.object({ id, o: outputInput }), { id: nodeId, o: output }, (v) => run((c) => edit.addOutput(c, v.id, v.o)));
+const outputInput = z.object({ name: z.string().max(300), url: z.string().max(1000).optional(), isFinal: z.boolean().optional(), storagePath: z.string().max(400).optional() });
+export async function addOutputAction(nodeId: string, output: { name: string; url?: string; isFinal?: boolean; storagePath?: string }): Promise<EditResult> {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  return guard(z.object({ id, o: outputInput }), { id: nodeId, o: output }, (v) => run((c) => edit.addOutput(c, v.id, v.o, user.id)));
 }
 export async function updateOutputAction(outputId: string, output: { name: string; url?: string; isFinal?: boolean }): Promise<EditResult> {
   return guard(z.object({ id, o: outputInput }), { id: outputId, o: output }, (v) => run((c) => edit.updateOutput(c, v.id, v.o)));
@@ -123,4 +125,14 @@ export async function approveGroupAction(proposalId: string, name: string): Prom
 }
 export async function rejectGroupAction(proposalId: string): Promise<EditResult> {
   return guard(id, proposalId, (v) => run((c) => rejectGroupProposal(c, v)));
+}
+
+// ───── 결과 등록 대기: 나중에 / 해당 없음 / 되돌리기 ─────
+export async function setResultStateAction(nodeId: string, mode: string): Promise<EditResult> {
+  return guard(z.object({ id, m: z.enum(["snooze", "not_applicable", "reset"]) }), { id: nodeId, m: mode }, (v) =>
+    run(async (c) => {
+      const settings = await c.from("settings").select("result_snooze_days").maybeSingle();
+      return edit.setResultState(c, v.id, v.m, settings.data?.result_snooze_days ?? 3);
+    }),
+  );
 }

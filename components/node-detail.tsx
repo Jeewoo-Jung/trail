@@ -5,6 +5,7 @@
 import { Lock } from "lucide-react";
 import { useState } from "react";
 import { FieldEditor } from "@/components/field-editor";
+import { openStoredFile, removeStoredFile, uploadOutputFile } from "@/components/stored-files";
 import type { NodeActions } from "@/components/node-actions";
 import { Message, useAction } from "@/components/use-action";
 import { Badge, buttonClass } from "@/components/ui";
@@ -16,9 +17,9 @@ const inputClass = "w-full rounded-xl border border-line bg-surface px-3 py-2 te
 const LOCK_LABEL: Record<NodeLockable, string> = { name: "이름", kind: "종류", parent: "위치", period: "기간", description: "설명", portfolio_status: "상태" };
 const AI_FIELDS: StarField[] = ["situation", "task", "action", "result_conversation"];
 
-type Props = { tree: NodeTree; data: NodeData; node: TreeNode; actions?: NodeActions; onSelect: (id: string | null) => void };
+type Props = { tree: NodeTree; data: NodeData; node: TreeNode; actions?: NodeActions; onSelect: (id: string | null) => void; userId?: string; nowIso?: string };
 
-export function NodeDetail({ tree, data, node, actions, onSelect }: Props) {
+export function NodeDetail({ tree, data, node, actions, onSelect, userId, nowIso }: Props) {
   const parent = node.parentId ? tree.byId.get(node.parentId) : undefined;
   const fields = data.fields.filter((f) => f.nodeId === node.id);
   const evidence = data.evidence.filter((e) => e.nodeId === node.id);
@@ -48,7 +49,8 @@ export function NodeDetail({ tree, data, node, actions, onSelect }: Props) {
             <FieldEditor key={`${node.id}:${f}:${fields.find((x) => x.field === f)?.text ?? ""}`} nodeId={node.id} field={f} row={fields.find((x) => x.field === f)} evidence={evidence.filter((e) => e.field === f)} suggestions={suggestions.filter((s) => s.field === f)} actions={actions} />
           ))}
           <FieldEditor key={`${node.id}:result_external:${fields.find((x) => x.field === "result_external")?.text ?? ""}`} nodeId={node.id} field="result_external" row={fields.find((x) => x.field === "result_external")} evidence={evidence.filter((e) => e.field === "result_external")} suggestions={suggestions.filter((s) => s.field === "result_external")} actions={actions} hint="미입력 — 결과가 나오면 직접 적어 주세요(합격·평가 등)." />
-          <Outputs nodeId={node.id} outputs={outputs} actions={actions} />
+          <ResultState node={node} nowIso={nowIso} filled={fields.some((f) => f.field === "result_external" && f.text.trim() !== "") || outputs.some((o) => o.isFinal)} actions={actions} />
+          <Outputs nodeId={node.id} outputs={outputs} actions={actions} userId={userId} />
         </div>
       )}
 
@@ -190,44 +192,107 @@ function NodeProps({ tree, data, node, parent, hasFields, actions }: { tree: Nod
   );
 }
 
-function Outputs({ nodeId, outputs, actions }: { nodeId: string; outputs: NodeData["outputs"]; actions?: NodeActions }) {
+/** 결과 등록 상태: 비어 있으면 "결과 등록 대기"에 올라올 수 있고, 나중에·해당 없음으로 미룰 수 있다. */
+function ResultState({ node, filled, actions, nowIso }: { node: TreeNode; filled: boolean; actions?: NodeActions; nowIso?: string }) {
+  const act = useAction();
+  if (node.kind !== "activity") return null;
+  const state = filled ? "입력됨" : node.resultState === "not_applicable" ? "해당 없음" : node.resultState === "snoozed" && node.resultSnoozeUntil && Date.parse(node.resultSnoozeUntil) > Date.parse(nowIso ?? node.resultSnoozeUntil) - 1 ? `나중에(${node.resultSnoozeUntil.slice(0, 10)}까지 숨김)` : "미입력";
+  return (
+    <section aria-label="결과 등록 상태" className="flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-3 text-sm">
+      <span className="text-muted">결과 등록</span>
+      <Badge tone={filled ? "ok" : "neutral"}>{state}</Badge>
+      {actions && !filled && (
+        <span className="ml-auto flex flex-wrap gap-2">
+          {node.resultState === "empty" ? (
+            <>
+              <button type="button" disabled={act.pending} className={buttonClass.secondary} onClick={() => act.run(() => actions.setResultState(node.id, "snooze"))}>나중에</button>
+              <button type="button" disabled={act.pending} className={buttonClass.secondary} onClick={() => act.run(() => actions.setResultState(node.id, "not_applicable"))}>해당 없음</button>
+            </>
+          ) : (
+            <button type="button" disabled={act.pending} className={buttonClass.secondary} onClick={() => act.run(() => actions.setResultState(node.id, "reset"))}>다시 대기로</button>
+          )}
+        </span>
+      )}
+      <div className="w-full"><Message message={act.message} /></div>
+    </section>
+  );
+}
+
+function Outputs({ nodeId, outputs, actions, userId }: { nodeId: string; outputs: NodeData["outputs"]; actions?: NodeActions; userId?: string }) {
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [final, setFinal] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const act = useAction();
+  const file = useAction();
   return (
     <section aria-label="산출물" className="flex flex-col gap-2 rounded-2xl border border-line bg-surface p-4">
-      <h3 className="text-sm">산출물 {outputs.length > 0 ? `(${outputs.length})` : ""}</h3>
-      {outputs.length === 0 && <p className="text-sm text-subtle">미입력</p>}
+      <h3 className="text-sm">산출물·최종 산출물 {outputs.length > 0 ? `(${outputs.length})` : ""}</h3>
+      {outputs.length === 0 && <p className="text-sm text-subtle">미입력 — 링크나 파일을 등록할 수 있습니다(필수 아님). &lsquo;최종&rsquo;으로 표시하면 결과가 입력된 것으로 봅니다.</p>}
       <ul className="flex flex-col gap-2">
         {outputs.map((o) => (
           <li key={o.id} className="flex flex-wrap items-center gap-2 text-sm">
             {o.isFinal && <Badge tone="ok">최종</Badge>}
             {o.url ? <a href={o.url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">{o.name}</a> : <span>{o.name}</span>}
+            {o.storagePath && <button type="button" className="text-accent hover:underline" onClick={() => void openStoredFile(o.storagePath!).then((m) => m && file.run(async () => ({ ok: false, message: m })))}>파일 열기</button>}
             {actions && (
               <span className="ml-auto flex gap-1">
                 <button type="button" disabled={act.pending} className={buttonClass.secondary} onClick={() => act.run(() => actions.updateOutput(o.id, { name: o.name, url: o.url ?? "", isFinal: !o.isFinal }))}>{o.isFinal ? "최종 해제" : "최종으로"}</button>
-                <button type="button" disabled={act.pending} className={buttonClass.secondary} onClick={() => act.run(() => actions.removeOutput(o.id))}>지우기</button>
+                <button type="button" disabled={act.pending} className={buttonClass.secondary} onClick={() => act.run(() => actions.removeOutput(o.id), (r) => { if (r.ok && r.storagePath) void removeStoredFile(r.storagePath); })}>지우기</button>
               </span>
             )}
           </li>
         ))}
       </ul>
       {actions && (
-        <form
-          className="flex flex-wrap items-center gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            act.run(() => actions.addOutput(nodeId, { name, url, isFinal: final }), () => { setName(""); setUrl(""); setFinal(false); });
-          }}
-        >
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="산출물 이름" aria-label="산출물 이름" maxLength={NODE_LIMITS.outputNameMaxChars} className={`${inputClass} min-w-0 flex-1`} />
-          <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="링크(선택)" aria-label="산출물 링크" className={`${inputClass} min-w-0 flex-1`} />
-          <label className="flex items-center gap-1 text-xs text-muted"><input type="checkbox" checked={final} onChange={(e) => setFinal(e.target.checked)} />최종</label>
-          <button type="submit" disabled={act.pending || name.trim() === ""} className={buttonClass.primary}>추가</button>
-        </form>
+        <>
+          <form
+            className="flex flex-wrap items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              act.run(() => actions.addOutput(nodeId, { name, url, isFinal: final }), () => { setName(""); setUrl(""); setFinal(false); });
+            }}
+          >
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="산출물 이름" aria-label="산출물 이름" maxLength={NODE_LIMITS.outputNameMaxChars} className={`${inputClass} min-w-0 flex-1`} />
+            <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="링크(선택)" aria-label="산출물 링크" className={`${inputClass} min-w-0 flex-1`} />
+            <label className="flex items-center gap-1 text-xs text-muted"><input type="checkbox" checked={final} onChange={(e) => setFinal(e.target.checked)} />최종</label>
+            <button type="submit" disabled={act.pending || name.trim() === ""} className={buttonClass.primary}>추가</button>
+          </form>
+          {userId && (
+            <label className="flex flex-wrap items-center gap-2 text-xs text-muted">
+              파일 첨부(선택, 25MB 이하)
+              <input
+                type="file"
+                disabled={uploading}
+                aria-label="파일 첨부"
+                onChange={async (e) => {
+                  const picked = e.target.files?.[0];
+                  e.target.value = "";
+                  if (!picked) return;
+                  setUploading(true);
+                  const up = await uploadOutputFile(userId, nodeId, picked);
+                  if (!up.ok) {
+                    setUploading(false);
+                    file.run(async () => ({ ok: false, message: up.message }));
+                    return;
+                  }
+                  file.run(
+                    async () => {
+                      const added = await actions.addOutput(nodeId, { name: picked.name.slice(0, NODE_LIMITS.outputNameMaxChars), isFinal: final, storagePath: up.path });
+                      if (!added.ok) await removeStoredFile(up.path); // 기록하지 못한 파일은 남기지 않는다
+                      setUploading(false);
+                      return added;
+                    },
+                  );
+                }}
+              />
+              {uploading && <span>올리는 중…</span>}
+            </label>
+          )}
+          <Message message={act.message} />
+          <Message message={file.message} />
+        </>
       )}
-      <Message message={act.message} />
     </section>
   );
 }

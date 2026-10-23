@@ -4,9 +4,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { StoreError } from "../mcp/errors";
 import { NODE_LIMITS, STAR_LIMITS } from "../rules/limits";
+import { snoozeUntil } from "../rules/results";
 import { canBeChild, checkAddNode, checkEvidence, checkField, checkMoveNode, checkNodeInput, hasStar, mergeField, STAR_FIELD_LABEL, STAR_FIELDS, type NodeKind, type NodeLockable, type PortfolioStatus, type StarField } from "../rules/nodes";
 
-export type EditResult = { ok: true; message?: string; id?: string } | { ok: false; message: string };
+export type EditResult = { ok: true; message?: string; id?: string; storagePath?: string | null } | { ok: false; message: string };
 const fail = (message: string): EditResult => ({ ok: false, message });
 const NOT_FOUND = fail("대상을 찾을 수 없습니다.");
 
@@ -159,10 +160,12 @@ export async function setFieldText(client: SupabaseClient, nodeId: string, field
     check(del.error, "항목 지우기");
     const ev = await client.from("evidence").delete().eq("node_id", nodeId).eq("field", v.field);
     check(ev.error, "근거 지우기");
+    if (v.field === "result_external") await syncResultState(client, nodeId);
     return { ok: true };
   }
   const { error } = await client.from("node_fields").upsert({ node_id: nodeId, field: v.field, text: v.text, subject: v.subject, locked: true, updated_by: "user", updated_at: new Date().toISOString() }, { onConflict: "node_id,field" });
   check(error, "항목 저장");
+  if (v.field === "result_external") await syncResultState(client, nodeId);
   return { ok: true };
 }
 
@@ -248,32 +251,80 @@ export async function resolveSuggestion(client: SupabaseClient, id: string, mode
 
 const urlOk = (url: string) => /^https?:\/\/\S+$/i.test(url) && url.length <= NODE_LIMITS.urlMaxChars;
 
-export async function addOutput(client: SupabaseClient, nodeId: string, input: { name: string; url?: string; isFinal?: boolean }): Promise<EditResult> {
+/** 첨부 파일 경로는 "<내 id>/<노드 id>/<파일>" 모양이어야 한다(다른 사람·다른 노드의 파일을 가리키지 못하게 한다) */
+const pathOk = (path: string, userId: string, nodeId: string) => path.length <= 300 && path.startsWith(`${userId}/${nodeId}/`) && !path.slice(userId.length + nodeId.length + 2).includes("/") && !path.includes("..");
+
+type OutputInput = { name: string; url?: string; isFinal?: boolean; storagePath?: string };
+
+export async function addOutput(client: SupabaseClient, nodeId: string, input: OutputInput, userId?: string): Promise<EditResult> {
   const name = (input.name ?? "").trim();
   const url = input.url?.trim() ? input.url.trim() : null;
+  const storagePath = input.storagePath?.trim() ? input.storagePath.trim() : null;
   if (name === "" || name.length > NODE_LIMITS.outputNameMaxChars) return fail(`산출물 이름은 1~${NODE_LIMITS.outputNameMaxChars}자여야 합니다.`);
   if (url !== null && !urlOk(url)) return fail("링크는 http:// 또는 https://로 시작해야 합니다.");
+  if (storagePath !== null && (!userId || !pathOk(storagePath, userId, nodeId))) return fail("첨부 파일 경로가 올바르지 않습니다.");
   const { count, error } = await client.from("outputs").select("id", { count: "exact", head: true }).eq("node_id", nodeId);
   check(error, "산출물 세기");
   if ((count ?? 0) >= NODE_LIMITS.outputsMaxCount) return fail(`산출물은 노드당 ${NODE_LIMITS.outputsMaxCount}개까지입니다.`);
-  const ins = await client.from("outputs").insert({ node_id: nodeId, name, url, is_final: input.isFinal === true });
+  const ins = await client.from("outputs").insert({ node_id: nodeId, name, url, storage_path: storagePath, is_final: input.isFinal === true });
   check(ins.error, "산출물 저장");
+  await syncResultState(client, nodeId);
   return { ok: true };
 }
 
-export async function updateOutput(client: SupabaseClient, id: string, input: { name: string; url?: string; isFinal?: boolean }): Promise<EditResult> {
+export async function updateOutput(client: SupabaseClient, id: string, input: OutputInput): Promise<EditResult> {
   const name = (input.name ?? "").trim();
   const url = input.url?.trim() ? input.url.trim() : null;
   if (name === "" || name.length > NODE_LIMITS.outputNameMaxChars) return fail(`산출물 이름은 1~${NODE_LIMITS.outputNameMaxChars}자여야 합니다.`);
   if (url !== null && !urlOk(url)) return fail("링크는 http:// 또는 https://로 시작해야 합니다.");
-  const { data, error } = await client.from("outputs").update({ name, url, is_final: input.isFinal === true }).eq("id", id).select("id");
+  const { data, error } = await client.from("outputs").update({ name, url, is_final: input.isFinal === true }).eq("id", id).select("id, node_id");
   check(error, "산출물 수정");
-  return (data?.length ?? 0) > 0 ? { ok: true } : NOT_FOUND;
+  if ((data?.length ?? 0) === 0) return NOT_FOUND;
+  await syncResultState(client, data![0].node_id as string);
+  return { ok: true };
 }
 
+/** 지운 산출물의 첨부 파일 경로를 돌려준다(화면이 Storage에서 파일도 지운다) */
 export async function removeOutput(client: SupabaseClient, id: string): Promise<EditResult> {
+  const found = await client.from("outputs").select("node_id, storage_path").eq("id", id).maybeSingle();
+  check(found.error, "산출물 읽기");
+  if (!found.data) return NOT_FOUND;
   const { error } = await client.from("outputs").delete().eq("id", id);
   check(error, "산출물 지우기");
+  await syncResultState(client, found.data.node_id as string);
+  return { ok: true, storagePath: (found.data.storage_path as string | null) ?? null };
+}
+
+// ───────── 결과 상태(결과 등록 대기) ─────────
+
+/** 결과가 채워졌으면(외부 결과 글 또는 최종 산출물) 상태를 채워짐으로, 비워졌으면 채워짐을 비어 있음으로 되돌린다. 숨김·해당 없음은 건드리지 않는다. */
+async function syncResultState(client: SupabaseClient, nodeId: string): Promise<void> {
+  const [field, finals, node] = await Promise.all([
+    client.from("node_fields").select("text").eq("node_id", nodeId).eq("field", "result_external").maybeSingle(),
+    client.from("outputs").select("id", { count: "exact", head: true }).eq("node_id", nodeId).eq("is_final", true),
+    client.from("nodes").select("result_state").eq("id", nodeId).maybeSingle(),
+  ]);
+  check(field.error, "결과 읽기");
+  check(finals.error, "산출물 읽기");
+  check(node.error, "노드 읽기");
+  if (!node.data) return;
+  const filled = (field.data?.text ?? "").trim() !== "" || (finals.count ?? 0) > 0;
+  const state = node.data.result_state as string;
+  const next = filled ? "filled" : state === "filled" ? "empty" : state;
+  if (next === state) return;
+  const { error } = await client.from("nodes").update({ result_state: next, result_snooze_until: null }).eq("id", nodeId);
+  check(error, "결과 상태 저장");
+}
+
+/** "나중에"(숨김 기간 동안 숨김), "해당 없음", 되돌리기. 결과가 이미 채워진 활동은 상태를 바꾸지 않는다. */
+export async function setResultState(client: SupabaseClient, nodeId: string, mode: "snooze" | "not_applicable" | "reset", snoozeDays: number, now: Date = new Date()): Promise<EditResult> {
+  const found = await client.from("nodes").select("result_state, kind").eq("id", nodeId).is("deleted_at", null).maybeSingle();
+  check(found.error, "노드 읽기");
+  if (!found.data) return NOT_FOUND;
+  if (found.data.result_state === "filled") return fail("결과가 이미 입력돼 있습니다.");
+  const patch = mode === "snooze" ? { result_state: "snoozed", result_snooze_until: snoozeUntil(now, snoozeDays) } : mode === "not_applicable" ? { result_state: "not_applicable", result_snooze_until: null } : { result_state: "empty", result_snooze_until: null };
+  const { error } = await client.from("nodes").update(patch).eq("id", nodeId);
+  check(error, "결과 상태 저장");
   return { ok: true };
 }
 

@@ -212,7 +212,7 @@ async function createActivity(store: NodeStore, nodes: StoredNode[], input: Acti
       const room = checkAddNode(nodes, null, "project");
       if (!room.ok) return { ok: false, message: room.message };
       const made = await store.insertNode({ parentId: null, kind: "project", name: project.value.name, description: "", startDate: null, endDate: null });
-      nodes.push({ id: made.id, parentId: null, kind: "project", portfolioStatus: "candidate", deletedAt: null, name: project.value.name, description: "", startDate: null, endDate: null, lockedFields: [], updatedAt: "" });
+      nodes.push({ id: made.id, parentId: null, kind: "project", portfolioStatus: "candidate", deletedAt: null, name: project.value.name, description: "", startDate: null, endDate: null, lockedFields: [], resultState: "empty", resultSnoozeUntil: null, resultAskedAt: null, updatedAt: "" });
       parentId = made.id;
       notes.push("프로젝트를 새로 만들었습니다.");
     }
@@ -222,5 +222,5 @@ async function createActivity(store: NodeStore, nodes: StoredNode[], input: Acti
   if (!placed.ok) return { ok: false, message: placed.message };
   const v = checked.value;
   const { id } = await store.insertNode({ parentId, kind, name: v.name, description: v.description, startDate: v.startDate, endDate: v.endDate });
-  return { ok: true, notes, node: { id, parentId, kind, portfolioStatus: "candidate", deletedAt: null, name: v.name, description: v.description, startDate: v.startDate, endDate: v.endDate, lockedFields: [], updatedAt: "" } };
+  return { ok: true, notes, node: { id, parentId, kind, portfolioStatus: "candidate", deletedAt: null, name: v.name, description: v.description, startDate: v.startDate, endDate: v.endDate, lockedFields: [], resultState: "empty", resultSnoozeUntil: null, resultAskedAt: null, updatedAt: "" } };
 }

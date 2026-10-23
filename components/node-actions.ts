@@ -2,7 +2,7 @@
 import type { EditResult } from "@/lib/my/node-edit";
 
 type Ev = { conversationTitle: string; conversationDate: string; excerpt: string };
-type Out = { name: string; url?: string; isFinal?: boolean };
+type Out = { name: string; url?: string; isFinal?: boolean; storagePath?: string };
 
 export type NodeActions = {
   create: (parentId: string | null, kind: string, name: string) => Promise<EditResult>;
@@ -24,6 +24,7 @@ export type NodeActions = {
   removeOutput: (outputId: string) => Promise<EditResult>;
   merge: (keepId: string, otherId: string) => Promise<EditResult>;
   split: (id: string, name: string, fields: string[], children: string[]) => Promise<EditResult>;
+  setResultState: (id: string, mode: string) => Promise<EditResult>;
   requestGroups: () => Promise<EditResult>;
   approveGroup: (proposalId: string, name: string) => Promise<EditResult>;
   rejectGroup: (proposalId: string) => Promise<EditResult>;

@@ -25,10 +25,12 @@ export default function MyPage() {
 async function SignedIn() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  const data = await loadNodeData(await createClient());
+  const supabase = await createClient();
+  const [data, settings] = await Promise.all([loadNodeData(supabase), supabase.from("settings").select("result_wait_days").maybeSingle()]);
   return (
     <NodeTreeView
       data={data}
+      result={{ userId: user.id, waitDays: settings.data?.result_wait_days ?? 7, nowIso: new Date().toISOString() }}
       actions={{
         create: actions.createNodeAction,
         update: actions.updateNodeAction,
@@ -49,6 +51,7 @@ async function SignedIn() {
         removeOutput: actions.removeOutputAction,
         merge: actions.mergeActivitiesAction,
         split: actions.splitActivityAction,
+        setResultState: actions.setResultStateAction,
         requestGroups: actions.requestGroupsAction,
         approveGroup: actions.approveGroupAction,
         rejectGroup: actions.rejectGroupAction,

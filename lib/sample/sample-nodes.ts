@@ -3,9 +3,9 @@ import { EMPTY_DATA, type EvidenceRow, type FieldRow, type NodeData, type NodeRo
 
 let order = 0;
 const node = (id: string, parentId: string | null, kind: NodeRow["kind"], name: string, over: Partial<NodeRow> = {}): NodeRow => ({
-  id, parentId, kind, name, description: "", startDate: null, endDate: null, portfolioStatus: "candidate", lockedFields: [], resultState: "empty", sortOrder: (order += 1), createdBy: "ai", deletedAt: null, updatedAt: "2026-09-30", ...over,
+  id, parentId, kind, name, description: "", startDate: null, endDate: null, portfolioStatus: "candidate", lockedFields: [], resultState: "empty", resultSnoozeUntil: null, resultAskedAt: null, sortOrder: (order += 1), createdBy: "ai", deletedAt: null, updatedAt: "2026-09-30", ...over,
 });
-const field = (nodeId: string, f: FieldRow["field"], text: string, over: Partial<FieldRow> = {}): FieldRow => ({ nodeId, field: f, text, subject: "did", locked: false, updatedBy: "ai", ...over });
+const field = (nodeId: string, f: FieldRow["field"], text: string, over: Partial<FieldRow> = {}): FieldRow => ({ nodeId, field: f, text, subject: "did", locked: false, updatedBy: "ai", updatedAt: "2026-09-30", ...over });
 const ev = (id: string, nodeId: string, f: EvidenceRow["field"], excerpt: string, title: string, date: string): EvidenceRow => ({ id, nodeId, field: f, conversationTitle: title, conversationDate: date, excerpt });
 
 const nodes: NodeRow[] = [

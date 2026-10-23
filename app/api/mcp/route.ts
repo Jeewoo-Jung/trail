@@ -1,4 +1,4 @@
-// Design Ref: DESIGN.md §14.4 — Claude 커스텀 커넥터가 호출하는 원격 MCP 접수 창구. 도구는 list_cards(이어붙일 활동·위치 조회), record_cards(활동 기록·병합), get_record_rules 세 개다.
+// Design Ref: DESIGN.md §14.4 — Claude 커스텀 커넥터가 호출하는 원격 MCP 접수 창구. 도구는 list_cards(이어붙일 활동·위치·결과 대기 조회), record_cards(활동 기록·병합), record_result(결과 저장), get_record_rules 네 개다.
 // 흐름: 크기 제한 → 토큰 확인(서명 + 내 계정) → 호출 횟수 → 도구 실행. 로그에는 종류·코드만 남기고 카드 내용은 남기지 않는다.
 import { createClient } from "@supabase/supabase-js";
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
@@ -9,6 +9,7 @@ import { loadRecordRules } from "@/lib/mcp/record-rules";
 import { verifyOwnerToken } from "@/lib/mcp/owner-auth";
 import { guardRequest } from "@/lib/mcp/rate-guard";
 import { recordActivities } from "@/lib/mcp/record-activities";
+import { recordResult } from "@/lib/mcp/record-result";
 import { createSupabaseRateStore } from "@/lib/mcp/supabase-rate-store";
 import { createSupabaseNodeStore } from "@/lib/mcp/supabase-node-store";
 import { StoreError } from "@/lib/mcp/errors";
@@ -65,7 +66,7 @@ const handler = createMcpHandler(
       "list_cards",
       {
         title: "이어붙일 활동·위치 조회",
-        description: "기록하기 전에 먼저 부른다. 기존 활동 목록(activities: id·경로·기간·채워진 항목·잠긴 항목), 새 활동을 둘 수 있는 위치(places), 이 대화에서 질문한 횟수(questionCount)와 이미 질문한 주제(askedTopics)를 돌려준다. 내용(요약·근거)은 돌려주지 않는다.",
+        description: "기록하기 전에 먼저 부른다. 기존 활동 목록(activities: id·경로·기간·채워진 항목·잠긴 항목), 새 활동을 둘 수 있는 위치(places), 이 대화에서 질문한 횟수(questionCount)와 이미 질문한 주제(askedTopics), 결과가 비어 있는 활동(resultsPending: askedBefore가 true이면 이미 물은 활동이라 다시 묻지 않는다)을 돌려준다. 내용(요약·근거)은 돌려주지 않는다.",
         inputSchema: z.object({ conversationKey: z.string().optional().describe("대화 키. 처음 기록하는 대화면 비운다.") }),
       },
       async (input, ctx) => {
@@ -125,6 +126,34 @@ const handler = createMcpHandler(
           const guard = await guardRequest(createSupabaseRateStore(client), 0);
           if (!guard.ok) return text(guard.message, true);
           const outcome = await recordActivities(createSupabaseNodeStore(client), input);
+          return outcome.ok ? text(outcome.output) : text(outcome.errors.join(" / "), true);
+        } catch (error) {
+          return text(describeFailure(error), true);
+        }
+      },
+    );
+
+    server.registerTool(
+      "record_result",
+      {
+        title: "활동 결과 저장",
+        description:
+          "사용자가 말한 활동의 결과(합격·평가 등 외부 결과)와 최종 산출물을 그 활동에 저장한다. action=save는 사용자가 실제로 말한 내용만 text·outputs에 담아 보낸다(지어내지 않는다). action=not_applicable은 사용자가 결과가 없다고 한 활동을 더 묻지 않게 한다. action=asked는 이 활동의 결과를 방금 사용자에게 물었다는 표시이며 활동당 한 번만 묻는다. 앱 화면에서 입력한 것과 같은 데이터가 갱신된다.",
+        inputSchema: z.object({
+          nodeId: z.string().describe("결과를 저장할 활동의 id(list_cards의 resultsPending[].id 또는 activities[].id)."),
+          action: z.enum(["save", "not_applicable", "asked"]).describe("save=결과 저장, not_applicable=해당 없음, asked=결과를 물었다는 표시."),
+          text: z.string().optional().describe("save일 때 사용자가 말한 외부 결과(300자 이하)."),
+          outputs: z.array(z.object({ name: z.string(), url: z.string().optional() })).max(5).optional().describe("save일 때 사용자가 말한 최종 산출물(이름, 선택적으로 http(s) 링크)."),
+        }),
+      },
+      async (input, ctx) => {
+        const token = ctx.http?.authInfo?.token;
+        if (!token) return text("인증 정보가 없습니다.", true);
+        try {
+          const client = clientFor(token);
+          const guard = await guardRequest(createSupabaseRateStore(client), 0);
+          if (!guard.ok) return text(guard.message, true);
+          const outcome = await recordResult(createSupabaseNodeStore(client), input);
           return outcome.ok ? text(outcome.output) : text(outcome.errors.join(" / "), true);
         } catch (error) {
           return text(describeFailure(error), true);

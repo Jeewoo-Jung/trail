@@ -11,6 +11,9 @@ export type StoredNode = NodeRef & {
   endDate: string | null;
   lockedFields: NodeLockable[];
   updatedAt: string;
+  resultState: "empty" | "snoozed" | "not_applicable" | "filled";
+  resultSnoozeUntil: string | null;
+  resultAskedAt: string | null;
 };
 
 export type StoredField = { field: StarField; text: string; locked: boolean };
@@ -37,5 +40,13 @@ export interface NodeStore {
   insertSuggestion(s: { nodeId: string; field: StarField; text: string; subject: Subject; evidence: readonly Evidence[]; conversationKey: string }): Promise<void>;
 
   listOutputs(nodeId: string): Promise<{ name: string; url: string | null }[]>;
-  insertOutput(nodeId: string, name: string, url: string | null): Promise<void>;
+  insertOutput(nodeId: string, name: string, url: string | null, isFinal?: boolean): Promise<void>;
+
+  /** 결과가 채워진 활동 id들(외부 결과 글이 있거나 최종 산출물이 있는 활동) */
+  listResultFilledNodeIds(): Promise<Set<string>>;
+  /** 사용자가 말한 외부 결과를 그 항목에 쓴다(내가 입력한 것이라 잠긴다) */
+  setResultText(nodeId: string, text: string): Promise<void>;
+  /** Claude가 이 활동의 결과를 채팅에서 물었다고 기록한다(활동당 1회) */
+  markResultAsked(nodeId: string): Promise<void>;
+  setResultState(nodeId: string, state: "empty" | "not_applicable" | "filled"): Promise<void>;
 }

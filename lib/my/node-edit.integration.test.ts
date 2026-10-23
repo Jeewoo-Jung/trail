@@ -2,7 +2,7 @@
 // 시험 데이터는 이름이 __시험으로 시작하고 끝에 그것만 지운다. 실행: npm run test:integration
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { addEvidence, addOutput, createNode, mergeActivities, moveNode, purgeNode, removeEvidence, removeOutput, resolveSuggestion, restoreNode, setFieldLock, setFieldSubject, setFieldText, splitActivity, trashNode, unlockNodeField, updateEvidence, updateNode, updateOutput } from "./node-edit";
+import { addEvidence, addOutput, createNode, mergeActivities, moveNode, purgeNode, removeEvidence, removeOutput, resolveSuggestion, restoreNode, setFieldLock, setResultState, setFieldSubject, setFieldText, splitActivity, trashNode, unlockNodeField, updateEvidence, updateNode, updateOutput } from "./node-edit";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -178,8 +178,49 @@ describe.skipIf(!enabled)("노드·활동 카드 편집 (실제 로그인으로 
     expect((await client.from("outputs").select("name, url, is_final").eq("id", o[0].id).single()).data).toEqual({ name: "고친 이름", url: null, is_final: false });
     for (let i = 1; i < 20; i += 1) await addOutput(client, id, { name: `산출${i}` });
     expect(await addOutput(client, id, { name: "스물한 번째" })).toMatchObject({ ok: false });
-    expect(await removeOutput(client, o[0].id)).toEqual({ ok: true });
+    expect(await removeOutput(client, o[0].id)).toEqual({ ok: true, storagePath: null });
     expect(await addOutput(client, id, { name: "다시" })).toEqual({ ok: true });
+  });
+
+  it("결과 상태: 외부 결과나 최종 산출물이 생기면 채워짐, 사라지면 비어 있음으로 돌아가고, 나중에·해당 없음은 채워진 활동에는 못 쓴다", async () => {
+    const id = await make("결과활동", "activity");
+    expect((await row(id)).result_state).toBe("empty");
+    expect(await setResultState(client, id, "snooze", 3, new Date("2026-10-30T00:00:00Z"))).toEqual({ ok: true });
+    expect(await row(id)).toMatchObject({ result_state: "snoozed", result_snooze_until: "2026-11-02T00:00:00+00:00" });
+    expect(await setResultState(client, id, "not_applicable", 3)).toEqual({ ok: true });
+    expect((await row(id)).result_state).toBe("not_applicable");
+    expect(await setResultState(client, id, "reset", 3)).toEqual({ ok: true });
+    expect(await row(id)).toMatchObject({ result_state: "empty", result_snooze_until: null });
+    await setFieldText(client, id, "result_external", "1차 합격", "did");
+    expect((await row(id)).result_state).toBe("filled");
+    expect(await setResultState(client, id, "snooze", 3)).toMatchObject({ ok: false });
+    await setFieldText(client, id, "result_external", "", "did");
+    expect((await row(id)).result_state).toBe("empty");
+    expect(await addOutput(client, id, { name: "일반 산출물" })).toEqual({ ok: true });
+    expect((await row(id)).result_state).toBe("empty"); // 최종이 아니면 결과로 보지 않는다
+    expect(await addOutput(client, id, { name: "최종본", isFinal: true })).toEqual({ ok: true });
+    expect((await row(id)).result_state).toBe("filled");
+    const finals = (await client.from("outputs").select("id").eq("node_id", id).eq("is_final", true)).data!;
+    expect(await removeOutput(client, finals[0].id)).toMatchObject({ ok: true, storagePath: null });
+    expect((await row(id)).result_state).toBe("empty");
+    expect(await setResultState(client, ZERO, "snooze", 3)).toMatchObject({ ok: false });
+  });
+
+  it("첨부 파일 경로는 내 id·이 노드 id 폴더 아래의 파일 하나만 받고, 지운 산출물의 경로를 돌려준다", async () => {
+    const id = await make("첨부활동", "activity");
+    const other = await make("첨부다른활동", "activity");
+    const { data: me } = await client.auth.getUser();
+    const uid = me.user!.id;
+    const good = `${uid}/${id}/abc-보고서.pdf`;
+    expect(await addOutput(client, id, { name: "보고서.pdf", storagePath: good, isFinal: true }, uid)).toEqual({ ok: true });
+    for (const bad of [`${uid}/${other}/x.pdf`, `${ZERO}/${id}/x.pdf`, `${uid}/${id}/a/b.pdf`, `${uid}/${id}/../x.pdf`, "x.pdf"]) {
+      expect(await addOutput(client, id, { name: "나쁜 경로", storagePath: bad }, uid)).toMatchObject({ ok: false });
+    }
+    expect(await addOutput(client, id, { name: "사용자 id 없음", storagePath: good })).toMatchObject({ ok: false });
+    const o = (await client.from("outputs").select("id, storage_path").eq("node_id", id)).data!;
+    expect(o).toHaveLength(1);
+    expect(await removeOutput(client, o[0].id)).toEqual({ ok: true, storagePath: good });
+    expect(await removeOutput(client, o[0].id)).toMatchObject({ ok: false });
   });
 
   it("합치기: 항목은 이어 붙이고, 근거·산출물·세부활동을 옮기며, 합친 쪽은 휴지통에 간다", async () => {

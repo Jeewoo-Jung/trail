@@ -201,6 +201,22 @@ describe("listActivities", () => {
     expect(r.output.places.map((p) => p.path).sort()).toEqual(["취업", "취업 > 공모전", "취업 > 공모전 > 기획"]);
     expect(r.output.questionCount).toBe(0);
   });
+  it("결과가 비어 있는 활동을 알려 주고(이미 물은 활동은 표시), 채워졌거나 해당 없음인 활동은 뺀다", async () => {
+    const store = new FakeNodeStore();
+    const proj = store.addNode({ kind: "project", name: "프로젝트" });
+    const empty = store.addNode({ kind: "activity", name: "비어 있음", parentId: proj.id });
+    const asked = store.addNode({ kind: "activity", name: "이미 물음", parentId: proj.id, resultAskedAt: "2026-10-01T00:00:00Z" });
+    const filled = store.addNode({ kind: "activity", name: "채워짐", parentId: proj.id });
+    const na = store.addNode({ kind: "activity", name: "해당 없음", parentId: proj.id, resultState: "not_applicable" });
+    store.setField(filled.id, "result_external", "합격");
+    void na;
+    const r = await listActivities(store, {});
+    if (!r.ok) throw new Error();
+    expect(r.output.resultsPending).toEqual([
+      { id: empty.id, path: "프로젝트 > 비어 있음", askedBefore: false },
+      { id: asked.id, path: "프로젝트 > 이미 물음", askedBefore: true },
+    ]);
+  });
   it("대화 키가 있으면 질문 횟수와 질문한 주제를 알려 주고, 모르는 키는 거절한다", async () => {
     const store = new FakeNodeStore();
     const rec = ok(await recordActivities(store, { questionCount: 2, topicKey: "주제A", activities: [{ name: "활동" }] }));

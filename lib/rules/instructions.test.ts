@@ -33,10 +33,17 @@ describe("instructions/trail-record-rules.md", () => {
     expect(body).toContain("외부 결과");
     expect(body).toContain("근거(`evidence`)가 없으면 그 항목은 보내지 않는다");
   });
+  it("결과 묻기 규칙(활동당 1회·주제 관련 대화만·지어내지 않기·300자)을 담고 있다", () => {
+    expect(body).toContain("활동당 최대 1회");
+    expect(body).toContain("주제가 그 활동·프로젝트와 관련 있을 때만");
+    expect(body).toContain("내가 실제로 말한 것만");
+    expect(body).toContain(`**${STAR_LIMITS.result_external}자 이하**`);
+    for (const action of ["save", "not_applicable", "asked"]) expect(body).toContain(`\`${action}\``);
+  });
   it("옛 방식(프로젝트 주제 자동 기록·항상 제외·분류 후보)을 더 이상 쓰지 않는다", () => {
     for (const old of ["projectTopics", "excludeTopics", "항상 제외", "candidates", "cardId", "미분류"]) expect(body).not.toContain(old);
   });
   it("실제 도구 이름과 입력 칸 이름을 쓰고 있다", () => {
-    for (const name of ["list_cards", "record_cards", "get_record_rules", "questionCount", "askedTopics", "topicKey", "nodeId", "parentId", "projectName", "대화 키"]) expect(body).toContain(name);
+    for (const name of ["list_cards", "record_cards", "record_result", "get_record_rules", "resultsPending", "askedBefore", "questionCount", "askedTopics", "topicKey", "nodeId", "parentId", "projectName", "대화 키"]) expect(body).toContain(name);
   });
 });

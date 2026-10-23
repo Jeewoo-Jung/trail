@@ -2,6 +2,7 @@
 // 이 대화에서 이미 질문한 주제를 알려 줘서 중복 활동과 같은 주제의 반복 질문을 줄인다. 요약·근거 내용은 돌려주지 않는다.
 import { z } from "zod";
 import { documentNodeIds, hasStar, STAR_FIELDS, type NodeKind } from "../rules/nodes";
+import { chatPendingResults } from "../rules/results";
 import type { NodeStore, StoredNode } from "./node-store";
 
 export const listInputSchema = z.object({ conversationKey: z.uuid().optional() });
@@ -9,9 +10,13 @@ export const listInputSchema = z.object({ conversationKey: z.uuid().optional() }
 /** 이어붙이기 후보로 보여 줄 활동 수(최근에 고친 순) */
 export const ACTIVITY_CANDIDATES_MAX = 40;
 export const PLACE_CANDIDATES_MAX = 40;
+/** 결과를 물어볼 수 있는 활동으로 알려 줄 최대 개수 */
+export const RESULT_PENDING_MAX = 10;
 
 export type ActivityCandidate = { id: string; kind: NodeKind; path: string; startDate: string | null; endDate: string | null; filledFields: string[]; lockedFields: string[] };
 export type PlaceCandidate = { id: string; kind: NodeKind; path: string };
+/** 결과(외부 결과·최종 산출물)가 비어 있는 활동. askedBefore가 true이면 이미 물었으니 다시 묻지 않는다(활동당 1회). */
+export type ResultPending = { id: string; path: string; askedBefore: boolean };
 
 export type ListOutput = {
   conversationKey: string | null;
@@ -23,6 +28,7 @@ export type ListOutput = {
   activities: ActivityCandidate[];
   /** 새 활동을 둘 수 있는 위치(범주·프로젝트·활동) */
   places: PlaceCandidate[];
+  resultsPending: ResultPending[];
 };
 
 export type ListOutcome = { ok: true; output: ListOutput } | { ok: false; errors: string[] };
@@ -33,7 +39,7 @@ function pathOf(byId: Map<string, StoredNode>, node: StoredNode): string {
   return names.join(" > ");
 }
 
-export async function listActivities(store: NodeStore, rawInput: unknown): Promise<ListOutcome> {
+export async function listActivities(store: NodeStore, rawInput: unknown, now: Date = new Date()): Promise<ListOutcome> {
   const parsed = listInputSchema.safeParse(rawInput ?? {});
   if (!parsed.success) return { ok: false, errors: ["conversationKey 값이 올바르지 않습니다"] };
   const { conversationKey } = parsed.data;
@@ -72,6 +78,12 @@ export async function listActivities(store: NodeStore, rawInput: unknown): Promi
     .slice(0, PLACE_CANDIDATES_MAX)
     .map((n) => ({ id: n.id, kind: n.kind, path: pathOf(byId, n) }));
 
-  return { ok: true, output: { conversationKey: conversationKey ?? null, questionCount, askedTopics, activities, places } };
+  const filledIds = await store.listResultFilledNodeIds();
+  const resultsPending = chatPendingResults({ nodes: nodes.filter((n) => visible.has(n.id)), filledIds, now })
+    .sort((a, b) => Number(a.askedBefore) - Number(b.askedBefore))
+    .slice(0, RESULT_PENDING_MAX)
+    .map((r) => ({ id: r.nodeId, path: pathOf(byId, byId.get(r.nodeId)!), askedBefore: r.askedBefore }));
+
+  return { ok: true, output: { conversationKey: conversationKey ?? null, questionCount, askedTopics, activities, places, resultsPending } };
 }
 

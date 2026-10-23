@@ -75,3 +75,9 @@ export const GROUP_LIMITS = {
   /** Claude에게 보내는 노드 수(한 후보당) */
   maxNodesPerBucket: 30,
 } as const;
+
+/** 결과·산출물 첨부 파일. Storage 버킷에도 같은 크기 한도가 걸린다(supabase/migrations/…_storage_files.sql). */
+export const FILE_LIMITS = {
+  maxBytes: 25 * 1024 * 1024,
+  nameMaxChars: 80,
+} as const;

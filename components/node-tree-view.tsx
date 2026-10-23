@@ -9,10 +9,13 @@ import type { NodeActions } from "@/components/node-actions";
 import { Message, useAction } from "@/components/use-action";
 import { Badge, buttonClass, EmptyState } from "@/components/ui";
 import { NODE_LIMITS } from "@/lib/rules/limits";
+import { pendingResults } from "@/lib/rules/results";
 import { buildNodeTree, childKindsFor, flatten, trashedRoots, type NodeData, type NodeRow, type TreeNode } from "@/lib/rules/node-tree";
 import { NODE_KIND_LABEL, PORTFOLIO_LABEL, type NodeKind } from "@/lib/rules/nodes";
 
-export function NodeTreeView({ data, actions, aiEnabled = false }: { data: NodeData; actions?: NodeActions; /** Claude API 키가 있어 묶기 제안을 만들 수 있는지 */ aiEnabled?: boolean }) {
+export type ResultConfig = { userId: string; waitDays: number; /** 서버가 정한 현재 시각(화면이 다시 그려져도 값이 흔들리지 않게 한다) */ nowIso: string };
+
+export function NodeTreeView({ data, actions, aiEnabled = false, result }: { data: NodeData; actions?: NodeActions; /** Claude API 키가 있어 묶기 제안을 만들 수 있는지 */ aiEnabled?: boolean; result?: ResultConfig }) {
   const tree = useMemo(() => buildNodeTree(data), [data]);
   const trashed = useMemo(() => trashedRoots(data.nodes), [data.nodes]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -57,6 +60,7 @@ export function NodeTreeView({ data, actions, aiEnabled = false }: { data: NodeD
 
   return (
     <div className="flex flex-col gap-6">
+      {actions && result && <ResultPanel data={data} tree={tree} actions={actions} config={result} onSelect={setSelected} />}
       {actions && <GroupPanel data={data} actions={actions} aiEnabled={aiEnabled} onCreated={setSelected} />}
       <div className="grid gap-6 md:grid-cols-[20rem_1fr]">
         <nav aria-label="노드 트리" className="flex flex-col gap-1 text-sm">
@@ -65,7 +69,7 @@ export function NodeTreeView({ data, actions, aiEnabled = false }: { data: NodeD
         </nav>
         <section aria-label="상세" className="min-w-0">
           {node ? (
-            <NodeDetail tree={tree} data={data} node={node} actions={actions} onSelect={setSelected} />
+            <NodeDetail tree={tree} data={data} node={node} actions={actions} onSelect={setSelected} userId={result?.userId} nowIso={result?.nowIso} />
           ) : (
             <EmptyState title={total === 0 ? "아직 기록이 없습니다" : "노드를 골라 보세요"}>
               {total === 0 ? "Claude와 대화하다 기록하면 프로젝트와 활동이 자동으로 만들어져 여기에 나타납니다. 왼쪽 아래에서 직접 추가할 수도 있어요." : "왼쪽에서 프로젝트나 활동을 고르면 STAR 내용과 근거를 보고 바로 고칠 수 있습니다."}
@@ -84,6 +88,33 @@ export function NodeTreeView({ data, actions, aiEnabled = false }: { data: NodeD
         </section>
       )}
     </div>
+  );
+}
+
+/** 결과 등록 대기: 프로젝트에 새 기록이 대기 일수(설정)를 넘게 없고 결과가 비어 있는 활동. 항목마다 나중에·해당 없음을 고를 수 있다. */
+function ResultPanel({ data, tree, actions, config, onSelect }: { data: NodeData; tree: ReturnType<typeof buildNodeTree>; actions: NodeActions; config: ResultConfig; onSelect: (id: string) => void }) {
+  const act = useAction();
+  const pending = useMemo(
+    () => pendingResults({ nodes: data.nodes, fields: data.fields.map((f) => ({ nodeId: f.nodeId, field: f.field, text: f.text, updatedAt: f.updatedAt })), outputs: data.outputs.map((o) => ({ nodeId: o.nodeId, isFinal: o.isFinal })), now: new Date(config.nowIso), waitDays: config.waitDays }),
+    [data, config.nowIso, config.waitDays],
+  );
+  if (pending.length === 0) return null;
+  return (
+    <section aria-label="결과 등록 대기" className="flex flex-col gap-3 rounded-2xl border border-warn/60 bg-surface p-4 text-sm">
+      <h2 className="text-base">결과 등록 대기 {pending.length}</h2>
+      <p className="text-muted">새 기록이 {config.waitDays}일 넘게 없는 프로젝트의 활동인데 외부 결과나 최종 산출물이 아직 비어 있습니다. 나중에 입력하거나 해당 없음으로 닫을 수 있어요.</p>
+      <ul className="flex flex-col gap-2">
+        {pending.map((p) => (
+          <li key={p.nodeId} className="flex flex-wrap items-center gap-2 rounded-xl border border-line px-3 py-2">
+            <span className="min-w-0 flex-1">{tree.byId.get(p.nodeId)?.path.join(" › ") ?? "(없어진 활동)"}<span className="ml-2 text-xs text-subtle">마지막 기록 {p.daysSince}일 전</span></span>
+            <button type="button" className={buttonClass.primary} onClick={() => onSelect(p.nodeId)}>결과 입력</button>
+            <button type="button" disabled={act.pending} className={buttonClass.secondary} onClick={() => act.run(() => actions.setResultState(p.nodeId, "snooze"))}>나중에</button>
+            <button type="button" disabled={act.pending} className={buttonClass.secondary} onClick={() => act.run(() => actions.setResultState(p.nodeId, "not_applicable"))}>해당 없음</button>
+          </li>
+        ))}
+      </ul>
+      <Message message={act.message} />
+    </section>
   );
 }
 

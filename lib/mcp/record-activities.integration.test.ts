@@ -4,6 +4,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { listActivities } from "./list-activities";
 import { recordActivities, type RecordOutput } from "./record-activities";
+import { recordResult } from "./record-result";
 import { createSupabaseNodeStore } from "./supabase-node-store";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -113,6 +114,30 @@ describe.skipIf(!enabled)("활동 기록·병합 (실제 로그인으로 시험)
     await client.rpc("trash_node", { p_id: id });
     const afterTrash = await listActivities(store, {});
     expect(afterTrash.ok && afterTrash.output.activities.some((a) => a.id === id)).toBe(false);
+  });
+
+  it("결과 저장: 결과가 비어 있는 활동을 알려 주고, 질문함 표시·사용자가 말한 결과·해당 없음이 같은 칸에 저장된다", async () => {
+    const store = createSupabaseNodeStore(client);
+    const made = ok(await recordActivities(store, { activities: [{ name: "__시험결과활동" }, { name: "__시험결과활동2" }] }));
+    const [a, b] = made.results.map((r) => r.nodeId!);
+    const before = await listActivities(store, {});
+    if (!before.ok) throw new Error();
+    expect(before.output.resultsPending.filter((r) => [a, b].includes(r.id)).map((r) => r.askedBefore)).toEqual([false, false]);
+
+    expect(await recordResult(store, { nodeId: a, action: "asked" })).toMatchObject({ ok: true, output: { status: "marked" } });
+    const asked = await listActivities(store, {});
+    expect(asked.ok && asked.output.resultsPending.find((r) => r.id === a)?.askedBefore).toBe(true);
+
+    expect(await recordResult(store, { nodeId: a, action: "save", text: "1차 합격", outputs: [{ name: "__시험최종본", url: "https://example.com/final" }] })).toMatchObject({ ok: true, output: { status: "saved", textSaved: true, outputsAdded: 1 } });
+    const f = (await client.from("node_fields").select("text, subject, locked, updated_by").eq("node_id", a).eq("field", "result_external").single()).data!;
+    expect(f).toMatchObject({ text: "1차 합격", locked: true, updated_by: "user" });
+    expect((await client.from("outputs").select("name, is_final").eq("node_id", a)).data).toEqual([{ name: "__시험최종본", is_final: true }]);
+    expect((await client.from("nodes").select("result_state").eq("id", a).single()).data?.result_state).toBe("filled");
+
+    expect(await recordResult(store, { nodeId: b, action: "not_applicable" })).toMatchObject({ ok: true });
+    const after = await listActivities(store, {});
+    expect(after.ok && after.output.resultsPending.some((r) => [a, b].includes(r.id))).toBe(false);
+    expect(await recordResult(store, { nodeId: "00000000-0000-4000-8000-000000000000", action: "save", text: "x" })).toMatchObject({ ok: true, output: { status: "rejected" } });
   });
 
   it("모르는 대화 키·잘못된 입력은 거절한다", async () => {

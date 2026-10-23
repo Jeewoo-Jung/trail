@@ -13,12 +13,15 @@ export type NodeRow = {
   portfolioStatus: PortfolioStatus;
   lockedFields: NodeLockable[];
   resultState: "empty" | "snoozed" | "not_applicable" | "filled";
+  resultSnoozeUntil: string | null;
+  /** Claude가 채팅에서 이 활동의 결과를 이미 물은 시각(활동당 1회) */
+  resultAskedAt: string | null;
   sortOrder: number;
   createdBy: "ai" | "user";
   deletedAt: string | null;
   updatedAt: string;
 };
-export type FieldRow = { nodeId: string; field: StarField; text: string; subject: Subject; locked: boolean; updatedBy: "ai" | "user" };
+export type FieldRow = { nodeId: string; field: StarField; text: string; subject: Subject; locked: boolean; updatedBy: "ai" | "user"; updatedAt: string };
 export type EvidenceRow = Evidence & { id: string; nodeId: string; field: StarField };
 export type OutputRow = { id: string; nodeId: string; name: string; url: string | null; storagePath: string | null; isFinal: boolean };
 export type SuggestionRow = { id: string; nodeId: string; field: StarField; text: string; subject: Subject; evidence: Evidence[]; createdAt: string };

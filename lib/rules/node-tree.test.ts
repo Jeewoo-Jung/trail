@@ -3,7 +3,7 @@ import { buildNodeTree, childKindsFor, EMPTY_DATA, flatten, kindChoices, mergeCa
 
 let order = 0;
 const node = (id: string, parentId: string | null, kind: NodeRow["kind"], over: Partial<NodeRow> = {}): NodeRow => ({
-  id, parentId, kind, name: id, description: "", startDate: null, endDate: null, portfolioStatus: "candidate", lockedFields: [], resultState: "empty", sortOrder: (order += 1), createdBy: "user", deletedAt: null, updatedAt: "2026-10-01", ...over,
+  id, parentId, kind, name: id, description: "", startDate: null, endDate: null, portfolioStatus: "candidate", lockedFields: [], resultState: "empty", resultSnoozeUntil: null, resultAskedAt: null, sortOrder: (order += 1), createdBy: "user", deletedAt: null, updatedAt: "2026-10-01", ...over,
 });
 const data = (nodes: NodeRow[], suggestions: { id: string; nodeId: string }[] = []) => ({ ...EMPTY_DATA, nodes, suggestions: suggestions.map((s) => ({ ...s, field: "action" as const, text: "t", subject: "did" as const, evidence: [], createdAt: "" })) });
 

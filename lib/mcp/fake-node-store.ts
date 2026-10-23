@@ -17,7 +17,7 @@ export class FakeNodeStore implements NodeStore {
     if (this.failOn === where) throw new Error(`저장소 오류(${where}) 비밀 내용이 섞인 메시지`);
   }
   addNode(partial: Partial<StoredNode> & Pick<StoredNode, "kind" | "name">): StoredNode {
-    const node: StoredNode = { id: randomUUID(), parentId: null, portfolioStatus: "candidate", deletedAt: null, description: "", startDate: null, endDate: null, lockedFields: [], updatedAt: String(this.tick += 1).padStart(6, "0"), ...partial };
+    const node: StoredNode = { id: randomUUID(), parentId: null, portfolioStatus: "candidate", deletedAt: null, description: "", startDate: null, endDate: null, lockedFields: [], resultState: "empty", resultSnoozeUntil: null, resultAskedAt: null, updatedAt: String(this.tick += 1).padStart(6, "0"), ...partial };
     this.nodes.push(node);
     return node;
   }
@@ -68,5 +68,23 @@ export class FakeNodeStore implements NodeStore {
   async listOpenSuggestions(nodeId: string) { return this.suggestions.filter((s) => s.nodeId === nodeId).map((s) => ({ field: s.field, text: s.text })); }
   async insertSuggestion(s: { nodeId: string; field: StarField; text: string; subject: Subject; evidence: readonly Evidence[]; conversationKey: string }) { this.suggestions.push(s); }
   async listOutputs(nodeId: string) { return [...(this.outputs.get(nodeId) ?? [])]; }
-  async insertOutput(nodeId: string, name: string, url: string | null) { this.outputs.set(nodeId, [...(this.outputs.get(nodeId) ?? []), { name, url }]); }
+  finals = new Set<string>();
+  asked = new Set<string>();
+  async insertOutput(nodeId: string, name: string, url: string | null, isFinal = false) {
+    this.outputs.set(nodeId, [...(this.outputs.get(nodeId) ?? []), { name, url }]);
+    if (isFinal) this.finals.add(nodeId);
+  }
+  async listResultFilledNodeIds() {
+    const ids = new Set<string>(this.finals);
+    for (const [nodeId, m] of this.fields) if ((m.get("result_external")?.text ?? "").trim() !== "") ids.add(nodeId);
+    return ids;
+  }
+  async setResultText(nodeId: string, text: string) {
+    this.boom("setResultText");
+    const m = this.fields.get(nodeId) ?? new Map();
+    m.set("result_external", { text, subject: "did", locked: true, updatedBy: "user" });
+    this.fields.set(nodeId, m);
+  }
+  async markResultAsked(nodeId: string) { this.asked.add(nodeId); const n = this.nodes.find((x) => x.id === nodeId); if (n) n.resultAskedAt = "2026-10-30T00:00:00Z"; }
+  async setResultState(nodeId: string, state: "empty" | "not_applicable" | "filled") { const n = this.nodes.find((x) => x.id === nodeId); if (n) { n.resultState = state; n.resultSnoozeUntil = null; } }
 }

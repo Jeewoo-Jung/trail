@@ -490,8 +490,9 @@ PLAN 29에서 정했다. 이전에 따뜻한 차콜(테라코타 포인트)이�
 
 | 도구 | 입력 | 출력 |
 |---|---|---|
-| `list_cards` | `conversationKey?` | `conversationKey`, `questionCount`(이 대화에서 물은 횟수), `askedTopics`(이미 물은 주제), `activities`(이어붙일 활동·세부활동 최대 40개: id·종류·경로·기간·채워진 항목·잠긴 항목), `places`(새 활동을 둘 범주·프로젝트·활동 최대 40개: id·종류·경로). 휴지통·제외(조상 포함) 노드는 뺀다. 요약·근거 내용은 돌려주지 않는다 |
+| `list_cards` | `conversationKey?` | `conversationKey`, `questionCount`(이 대화에서 물은 횟수), `askedTopics`(이미 물은 주제), `activities`(이어붙일 활동·세부활동 최대 40개: id·종류·경로·기간·채워진 항목·잠긴 항목), `places`(새 활동을 둘 범주·프로젝트·활동 최대 40개: id·종류·경로). 휴지통·제외(조상 포함) 노드는 뺀다. `resultsPending`(결과가 비어 있는 활동 최대 10개: id·경로·askedBefore). 요약·근거 내용은 돌려주지 않는다 |
 | `record_cards` | `conversationKey?`, `questionCount?`(0~3), `topicKey?`, `activities[]`(최대 5) | `conversationKey`, 활동별 `results[]`: `status`(created/updated/rejected), `nodeId`, `name`, `fields`(situation·task·action·result_conversation별 set/appended/suggested/skipped/dropped), `outputsAdded`, `notes`, `reasons` |
+| `record_result` | `nodeId`, `action`(save/not_applicable/asked), `text?`, `outputs?` | `status`(saved/marked/rejected), `textSaved`, `outputsAdded`, `notes`, `reasons` — 사용자가 말한 결과·최종 산출물 저장(37번) |
 | `get_record_rules` | 없음 | `instructions/trail-record-rules.md`의 붙여 넣기 구간 + 목록 안내 한 줄 |
 
 - 활동 입력: `nodeId`(이어붙이기) 또는 `name`(새 활동) + `kind`(activity·subactivity·study) + `description`·`startDate`·`endDate` + 위치 `parentId`(places의 id) 또는 `projectName`(같은 이름의 최상위 프로젝트가 있으면 재사용, 없으면 새로 만듦, 공백·대소문자 무시) + `fields`(네 항목, 각 `text`·`subject`·`evidence[]`) + `outputs[]`(이름, http(s) 링크, 최대 5개).
@@ -522,8 +523,15 @@ PLAN 29에서 정했다. 이전에 따뜻한 차콜(테라코타 포인트)이�
 - **키가 없을 때**: `ANTHROPIC_API_KEY`가 없으면 "묶기 제안 받기"만 꺼지고(안내 문구 표시) 나머지 기능은 그대로다. 직접 노드를 만들고 옮겨서 묶을 수도 있다.
 - **제외(35번)**: 상세 화면의 "제외하기/제외 해제"는 삭제가 아닌 상태 변경이며 아래 가지가 함께 빠진다는 것을 안내한다. 제외된 노드(조상이 제외된 경우 포함)에는 Claude 기록이 거절된다.
 
-### 14.6 결과·산출물 파일 (37번)
+### 14.6 결과·산출물 파일 (37번 코드 완료, 버킷 적용은 사용자 확인 대기)
 - 비공개 Supabase Storage 버킷, 경로는 `사용자 id/노드 id/파일` 형태이고 RLS로 본인만 읽기·쓰기. 브라우저가 Storage로 **직접 업로드**한다(서버·Vercel을 거치지 않음, 4.5MB 제한 회피). 버킷 생성·정책 적용은 만들기 직전에 확인받는다.
+
+**37번 구현 메모 (결과·최종 산출물 등록)**
+- **채워짐의 기준**: 외부 결과 글(`result_external`)이 있거나 "최종"으로 표시한 산출물이 있으면 그 활동의 결과가 입력된 것이다. 둘 다 기본 "미입력"이다. 상태 열(`result_state`)은 이 기준에 맞춰 자동으로 `filled`/`empty`가 되고, "나중에"는 `snoozed`(+숨김 만료 시각), "해당 없음"은 `not_applicable`이다(채워진 활동에는 쓸 수 없음).
+- **앱의 "결과 등록 대기"**: 결과가 비어 있고 숨김이 아닌 **활동**(세부활동·제외·휴지통 제외)이, 소속 **프로젝트(없으면 그 활동 자신)** 아래에서 가장 최근에 고쳐지거나 기록된 시각(노드·항목 `updated_at`)이 대기 일수(설정, 기본 7일)보다 오래되면 `/my` 위쪽에 목록으로 뜬다. 항목마다 "결과 입력"(그 활동 열기)·"나중에"(설정의 숨김 일수, 기본 3일 동안 숨김)·"해당 없음". 이메일·푸시 알림은 없다.
+- **Claude 채팅**: `list_cards`의 `resultsPending`(결과 비어 있는 활동, `askedBefore` 표시, 최대 10개, 대기 일수와 무관)을 보고, 지침 규칙대로 활동당 1회·주제 관련 대화에서만 묻는다. 사용자가 말한 결과는 `record_result`(`save`: 외부 결과 300자·최종 산출물 이름/링크, `not_applicable`, `asked`)로 저장되어 앱 화면과 같은 칸이 갱신된다. 사용자의 말을 옮긴 것이라 그 항목은 잠기고, 근거 없이도 저장된다. Claude가 만드는 기록(`record_cards`)은 여전히 외부 결과를 쓸 수 없다.
+- **파일 첨부**: 산출물 추가 영역의 "파일 첨부(선택, 25MB 이하)". 브라우저가 로그인 토큰으로 Storage 버킷 `trail-files`에 `<내 id>/<노드 id>/<무작위>-<안전한 이름>`로 직접 올리고, 성공하면 그 경로를 산출물 행(`storage_path`)에 기록한다. 기록하지 못하면 올린 파일을 지운다. 열 때는 60초짜리 임시 주소를 받는다. 앱은 경로가 내 id·그 노드 id 폴더 아래의 파일 하나인지 다시 검사한다. 산출물을 지우면 Storage의 파일도 지운다.
+- **버킷 규칙(적용 대기)**: 비공개, 파일당 25MB, 로그인한 사용자는 첫 폴더가 자기 id인 경로만 읽기·쓰기·고치기·지우기, anon에는 규칙 없음. 버킷이 없는 동안 파일 첨부는 "파일 저장소가 아직 준비되지 않았습니다"로 안내하고 링크 등록은 그대로 된다.
 
 ### 14.7 기존 구현과의 관계 (32번에서 확정)
 

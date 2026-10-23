@@ -42,7 +42,7 @@ export function createSupabaseNodeStore(client: SupabaseClient): NodeStore {
     },
 
     async listNodes(): Promise<StoredNode[]> {
-      const { data, error } = await client.from("nodes").select("id, parent_id, kind, name, description, start_date, end_date, portfolio_status, locked_fields, deleted_at, updated_at");
+      const { data, error } = await client.from("nodes").select("id, parent_id, kind, name, description, start_date, end_date, portfolio_status, locked_fields, deleted_at, updated_at, result_state, result_snooze_until, result_asked_at");
       check(error, "노드 읽기");
       return (data ?? []).map((r) => ({
         id: r.id,
@@ -56,6 +56,9 @@ export function createSupabaseNodeStore(client: SupabaseClient): NodeStore {
         lockedFields: (r.locked_fields ?? []) as NodeLockable[],
         deletedAt: r.deleted_at,
         updatedAt: r.updated_at,
+        resultState: r.result_state,
+        resultSnoozeUntil: r.result_snooze_until,
+        resultAskedAt: r.result_asked_at,
       }));
     },
 
@@ -114,9 +117,34 @@ export function createSupabaseNodeStore(client: SupabaseClient): NodeStore {
       return (data ?? []).map((r) => ({ name: r.name, url: r.url }));
     },
 
-    async insertOutput(nodeId: string, name: string, url: string | null): Promise<void> {
-      const { error } = await client.from("outputs").insert({ node_id: nodeId, name, url });
+    async insertOutput(nodeId: string, name: string, url: string | null, isFinal = false): Promise<void> {
+      const { error } = await client.from("outputs").insert({ node_id: nodeId, name, url, is_final: isFinal });
       check(error, "산출물 저장");
+    },
+
+    async listResultFilledNodeIds(): Promise<Set<string>> {
+      const [fields, outputs] = await Promise.all([
+        client.from("node_fields").select("node_id, text").eq("field", "result_external"),
+        client.from("outputs").select("node_id").eq("is_final", true),
+      ]);
+      check(fields.error, "결과 읽기");
+      check(outputs.error, "산출물 읽기");
+      return new Set([...(fields.data ?? []).filter((r) => String(r.text).trim() !== "").map((r) => r.node_id as string), ...(outputs.data ?? []).map((r) => r.node_id as string)]);
+    },
+
+    async setResultText(nodeId: string, text: string): Promise<void> {
+      const { error } = await client.from("node_fields").upsert({ node_id: nodeId, field: "result_external", text, subject: "did", locked: true, updated_by: "user", updated_at: new Date().toISOString() }, { onConflict: "node_id,field" });
+      check(error, "결과 저장");
+    },
+
+    async markResultAsked(nodeId: string): Promise<void> {
+      const { error } = await client.from("nodes").update({ result_asked_at: new Date().toISOString() }).eq("id", nodeId);
+      check(error, "질문 기록 저장");
+    },
+
+    async setResultState(nodeId: string, state: "empty" | "not_applicable" | "filled"): Promise<void> {
+      const { error } = await client.from("nodes").update({ result_state: state, result_snooze_until: null }).eq("id", nodeId);
+      check(error, "결과 상태 저장");
     },
   };
 }
