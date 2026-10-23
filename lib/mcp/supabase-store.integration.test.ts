@@ -56,7 +56,8 @@ describe.skipIf(!enabled)("Supabase 저장소 (실제 로그인으로 시험)", 
     if (conversations.length > 0) await client.from("conversations").delete().in("key", conversations);
     if (settingsBefore === null) await client.from("settings").delete().eq("user_id", userId);
     else await client.from("settings").update(settingsBefore).eq("user_id", userId);
-    await client.auth.signOut();
+    // 시험이 만든 로그인만 끝낸다. 전체 로그아웃(global)이면 내가 브라우저에서 쓰는 로그인까지 끊긴다.
+    await client.auth.signOut({ scope: "local" });
   });
 
   it("내 계정으로 로그인했다 (OWNER_USER_ID와 같은 계정)", () => {
