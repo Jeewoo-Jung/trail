@@ -62,6 +62,7 @@ async function SignedIn() {
           <a href="/api/export?format=md" download className="rounded-full border border-black/15 px-4 py-1.5 text-sm font-medium dark:border-white/20">Markdown</a>
           <a href="/api/export?format=json" download className="rounded-full border border-black/15 px-4 py-1.5 text-sm font-medium dark:border-white/20">JSON</a>
         </span>
+        <Link href="/my/import" className="rounded-full border border-black/15 px-4 py-1.5 text-sm font-medium dark:border-white/20">대화 추천</Link>
         <Link href="/my/mindmap" className="rounded-full border border-black/15 px-4 py-1.5 text-sm font-medium dark:border-white/20">마인드맵</Link>
         <Link href="/my/settings" className="rounded-full border border-black/15 px-4 py-1.5 text-sm font-medium dark:border-white/20">설정</Link>
         <form action={logout}>

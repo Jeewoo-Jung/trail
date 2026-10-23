@@ -39,6 +39,12 @@ export class FakeStore implements CardStore {
     return { alwaysExcluded: [...this.exclusions.alwaysExcluded], blocked: [...this.exclusions.blocked] };
   }
 
+  projectTopics: string[] = [];
+
+  async getProjectTopics(): Promise<string[]> {
+    return [...this.projectTopics];
+  }
+
   async addAlwaysExcluded(topics: string[]): Promise<void> {
     this.exclusions.alwaysExcluded = cleanTopicList([...this.exclusions.alwaysExcluded, ...topics]);
   }

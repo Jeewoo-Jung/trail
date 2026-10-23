@@ -15,6 +15,8 @@ export type ListOutput = {
   topConcepts: ConceptLists["topConcepts"];
   approvedSubConcepts: ConceptLists["approvedSubConcepts"];
   excludedTopics: string[];
+  /** 내가 정한 프로젝트 주제. 여기 있는 주제의 결정은 묻지 않고 기록한다. 비어 있으면 아직 정하지 않은 것이다. */
+  projectTopics: string[];
 };
 
 export type ListOutcome = { ok: true; output: ListOutput } | { ok: false; errors: string[] };
@@ -35,7 +37,7 @@ export async function listCards(store: CardStore, rawInput: unknown): Promise<Li
     cards = await store.listCards(conversationKey);
   }
 
-  const [concepts, exclusions] = await Promise.all([store.listConcepts(), store.getExclusions()]);
+  const [concepts, exclusions, projectTopics] = await Promise.all([store.listConcepts(), store.getExclusions(), store.getProjectTopics()]);
   return {
     ok: true,
     output: {
@@ -44,6 +46,7 @@ export async function listCards(store: CardStore, rawInput: unknown): Promise<Li
       topConcepts: concepts.topConcepts,
       approvedSubConcepts: concepts.approvedSubConcepts,
       excludedTopics: cleanTopicList([...exclusions.alwaysExcluded, ...exclusions.blocked]),
+      projectTopics: cleanTopicList(projectTopics),
     },
   };
 }
