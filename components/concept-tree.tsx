@@ -143,7 +143,7 @@ function Badge({ text, tone }: { text: string; tone: "gray" | "amber" | "blue" }
   return <span className={`rounded-full border px-2 py-0.5 text-xs ${color}`}>{text}</span>;
 }
 
-function CardItem({ card, deleteCard }: { card: TreeCard; deleteCard?: (formData: FormData) => Promise<void> }) {
+export function CardItem({ card, deleteCard }: { card: TreeCard; deleteCard?: (formData: FormData) => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const classification = card.topName ? `${card.topName} > ${card.subName ?? "하위 미정"}` : "미분류";
