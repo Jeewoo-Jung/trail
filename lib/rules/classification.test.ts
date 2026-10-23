@@ -12,6 +12,9 @@ const subs: SubConceptRef[] = [
 ];
 
 describe("decideClassification", () => {
+  it("'상위 > 하위' 모양으로 답해도 하위 이름만 쓴다", () => {
+    expect(decideClassification({ top: "취업준비", sub: "취업준비 > 정부 부처 인턴 활동" }, tops, subs)?.sub).toEqual({ kind: "existing", id: "s1" });
+  });
   it("승인된 하위 개념은 공백·대소문자 달라도 그대로 쓴다", () => {
     expect(decideClassification({ top: "취업 준비", sub: "정부 부처인턴활동" }, tops, subs)).toEqual({ topId: "t1", sub: { kind: "existing", id: "s1" } });
   });
