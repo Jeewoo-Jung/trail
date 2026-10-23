@@ -46,9 +46,9 @@ export function RealtimeStatus() {
   }, [router]);
 
   return (
-    <span className="flex items-center gap-2 text-xs text-zinc-500" role="status">
-      <span aria-hidden className={`inline-block h-2 w-2 rounded-full ${connected ? "bg-green-500" : "bg-zinc-400"}`} />
-      {connected ? "실시간 연결됨" : "연결 끊김 · 새로고침해 주세요"}
+    <span className="flex items-center gap-2 text-xs text-subtle" role="status">
+      <span aria-hidden className={`inline-block h-2 w-2 rounded-full ${connected ? "bg-ok" : "bg-subtle"}`} />
+      {connected ? "실시간 연결됨" : "연결 끊김"}
     </span>
   );
 }

@@ -9,19 +9,25 @@ export default function Home() {
   const tree = buildTree(SAMPLE_CARDS, SAMPLE_TOPS, SAMPLE_SUBS);
   return (
     <>
-      <div role="note" className="bg-amber-100 px-6 py-2 text-center text-sm font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
+      <div role="note" className="bg-warn/15 px-6 py-2 text-center text-sm font-medium text-warn">
         가상 샘플입니다. 내 기록이 아닙니다.
       </div>
-      <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-12">
-        <header className="flex flex-wrap items-end justify-between gap-4">
-          <div className="flex flex-col gap-2">
-            <h1 className="text-5xl font-bold tracking-tight">Trail</h1>
-            <p className="text-zinc-600 dark:text-zinc-400">Claude와 나눈 대화에서 정한 결정을 개념 트리로 모아 보는 개인용 앱입니다. 아래는 지어낸 예시입니다.</p>
-          </div>
-          <Link href="/login" className="rounded-full bg-black px-5 py-2 text-sm font-medium text-white dark:bg-white dark:text-black">
+      <header className="border-b border-line bg-sidebar">
+        <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-3">
+          <span className="flex items-center gap-2">
+            <span aria-hidden className="inline-block h-3 w-3 rounded-full bg-accent" />
+            <span className="font-serif text-2xl text-fg">Trail</span>
+          </span>
+          <Link href="/login" className="rounded-xl bg-brand px-4 py-2 text-sm font-medium text-on-accent hover:bg-accent">
             로그인
           </Link>
-        </header>
+        </div>
+      </header>
+      <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-3xl">개념 트리 둘러보기</h1>
+          <p className="max-w-2xl text-muted">Claude와 나눈 대화에서 정한 결정을 개념 트리로 모아 보는 개인용 앱입니다. 아래는 지어낸 예시입니다.</p>
+        </div>
         <ConceptTree tree={tree} />
       </main>
     </>
