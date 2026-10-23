@@ -49,7 +49,11 @@ async function SignedIn() {
         removeOutput: actions.removeOutputAction,
         merge: actions.mergeActivitiesAction,
         split: actions.splitActivityAction,
+        requestGroups: actions.requestGroupsAction,
+        approveGroup: actions.approveGroupAction,
+        rejectGroup: actions.rejectGroupAction,
       }}
+      aiEnabled={Boolean(process.env.ANTHROPIC_API_KEY)}
     />
   );
 }

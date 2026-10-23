@@ -12,7 +12,7 @@ import { NODE_LIMITS } from "@/lib/rules/limits";
 import { buildNodeTree, childKindsFor, flatten, trashedRoots, type NodeData, type NodeRow, type TreeNode } from "@/lib/rules/node-tree";
 import { NODE_KIND_LABEL, PORTFOLIO_LABEL, type NodeKind } from "@/lib/rules/nodes";
 
-export function NodeTreeView({ data, actions }: { data: NodeData; actions?: NodeActions }) {
+export function NodeTreeView({ data, actions, aiEnabled = false }: { data: NodeData; actions?: NodeActions; /** Claude API 키가 있어 묶기 제안을 만들 수 있는지 */ aiEnabled?: boolean }) {
   const tree = useMemo(() => buildNodeTree(data), [data]);
   const trashed = useMemo(() => trashedRoots(data.nodes), [data.nodes]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -57,6 +57,7 @@ export function NodeTreeView({ data, actions }: { data: NodeData; actions?: Node
 
   return (
     <div className="flex flex-col gap-6">
+      {actions && <GroupPanel data={data} actions={actions} aiEnabled={aiEnabled} onCreated={setSelected} />}
       <div className="grid gap-6 md:grid-cols-[20rem_1fr]">
         <nav aria-label="노드 트리" className="flex flex-col gap-1 text-sm">
           {tree.roots.length === 0 ? <p className="px-2 py-1 text-subtle">노드가 없습니다.</p> : tree.roots.map(branch)}
@@ -83,6 +84,43 @@ export function NodeTreeView({ data, actions }: { data: NodeData; actions?: Node
         </section>
       )}
     </div>
+  );
+}
+
+/** 상향식 묶기 제안: 같은 위치에 같은 종류의 노드가 쌓이면 새 상위 노드 후보를 한 단계씩 보여 준다. 승인한 것만 반영된다. */
+function GroupPanel({ data, actions, aiEnabled, onCreated }: { data: NodeData; actions: NodeActions; aiEnabled: boolean; onCreated: (id: string) => void }) {
+  const act = useAction();
+  const [names, setNames] = useState<Record<string, string>>({});
+  const nameOf = (id: string) => data.nodes.find((n) => n.id === id)?.name ?? "(없어진 노드)";
+  return (
+    <section aria-label="묶기 제안" className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-base">묶기 제안 {data.proposals.length > 0 ? data.proposals.length : ""}</h2>
+        <button type="button" disabled={!aiEnabled || act.pending} className={buttonClass.secondary} onClick={() => act.run(() => actions.requestGroups())} title={aiEnabled ? undefined : "Claude API 키가 없어 쓸 수 없습니다"}>
+          묶기 제안 받기
+        </button>
+      </div>
+      {!aiEnabled && <p className="text-xs text-warn">Claude API 키가 없어 묶기 제안을 만들 수 없습니다. 나머지 기능은 그대로 쓸 수 있고, 직접 노드를 만들어 옮겨 묶을 수도 있어요.</p>}
+      {data.proposals.length === 0 ? (
+        <p className="text-muted">같은 위치에 같은 종류의 노드가 4개 이상 쌓이면 &ldquo;묶기 제안 받기&rdquo;로 새 상위 노드 후보를 받아 볼 수 있습니다. 승인하기 전에는 아무것도 바뀌지 않습니다.</p>
+      ) : (
+        <ul className="flex flex-col gap-3">
+          {data.proposals.map((p) => (
+            <li key={p.id} className="flex flex-col gap-2 rounded-xl border border-line p-3">
+              <p>
+                <Badge tone="info">{`새 ${NODE_KIND_LABEL[p.kind]}`}</Badge> <span className="text-muted">{p.childIds.map(nameOf).join(", ")}</span> 을(를) 묶습니다.
+              </p>
+              <span className="flex flex-wrap items-center gap-2">
+                <input value={names[p.id] ?? p.name} onChange={(e) => setNames((prev) => ({ ...prev, [p.id]: e.target.value }))} aria-label="새 상위 노드 이름" maxLength={NODE_LIMITS.nameMaxChars} className="min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 py-1.5" />
+                <button type="button" disabled={act.pending} className={buttonClass.primary} onClick={() => act.run(() => actions.approveGroup(p.id, names[p.id] ?? p.name), (r) => { if (r.ok && r.id) onCreated(r.id); })}>승인</button>
+                <button type="button" disabled={act.pending} className={buttonClass.secondary} onClick={() => act.run(() => actions.rejectGroup(p.id))}>거절</button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <Message message={act.message} />
+    </section>
   );
 }
 

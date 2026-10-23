@@ -5,7 +5,7 @@ import { z } from "zod";
 import { countChars } from "../rules/text";
 import { NODE_LIMITS } from "../rules/limits";
 import { maskSecrets } from "../rules/mask-secrets";
-import { checkAddNode, checkField, checkNodeInput, hasStar, mergeField, STAR_FIELD_LABEL, SUBJECTS, type Evidence, type NodeKind, type StarField } from "../rules/nodes";
+import { checkAddNode, checkField, checkNodeInput, hasStar, isEffectivelyExcluded, mergeField, STAR_FIELD_LABEL, SUBJECTS, type Evidence, type NodeKind, type StarField } from "../rules/nodes";
 import { normalizeTopic } from "../rules/topic";
 import type { NodeStore, StoredNode } from "./node-store";
 
@@ -55,6 +55,7 @@ export type ActivityResult = {
 export type RecordOutput = { conversationKey: string; results: ActivityResult[] };
 export type RecordOutcome = { ok: true; output: RecordOutput } | { ok: false; errors: string[] };
 
+const EXCLUDED_REASON = "제외된 노드라서 기록하지 않았습니다. 사용자가 제외를 풀기 전에는 이어붙이거나 그 아래에 새로 만들지 않습니다.";
 const SAVE_FAILED = "저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
 const mask = (text: string) => maskSecrets(text).text;
 const maskEvidence = (e: Evidence): Evidence => ({ conversationTitle: mask(e.conversationTitle), conversationDate: e.conversationDate, excerpt: mask(e.excerpt) });
@@ -114,6 +115,7 @@ async function recordOne(store: NodeStore, conversationKey: string, input: Activ
     node = byId.get(input.nodeId);
     if (!node || node.deletedAt) return { status: "rejected", reasons: ["활동 id를 찾지 못했습니다. id 없이 새 활동으로 보내 주세요."] };
     if (!hasStar(node.kind)) return { status: "rejected", reasons: ["활동이나 세부활동에만 내용을 이어붙일 수 있습니다."] };
+    if (isEffectivelyExcluded(nodes, node.id)) return { status: "rejected", reasons: [EXCLUDED_REASON] };
   } else {
     const made = await createActivity(store, nodes, input);
     if (!made.ok) return { status: "rejected", reasons: [made.message] };
@@ -215,6 +217,7 @@ async function createActivity(store: NodeStore, nodes: StoredNode[], input: Acti
       notes.push("프로젝트를 새로 만들었습니다.");
     }
   }
+  if (parentId !== null && isEffectivelyExcluded(nodes, parentId)) return { ok: false, message: EXCLUDED_REASON };
   const placed = checkAddNode(nodes, parentId, kind);
   if (!placed.ok) return { ok: false, message: placed.message };
   const v = checked.value;

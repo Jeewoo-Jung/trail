@@ -24,4 +24,7 @@ export type NodeActions = {
   removeOutput: (outputId: string) => Promise<EditResult>;
   merge: (keepId: string, otherId: string) => Promise<EditResult>;
   split: (id: string, name: string, fields: string[], children: string[]) => Promise<EditResult>;
+  requestGroups: () => Promise<EditResult>;
+  approveGroup: (proposalId: string, name: string) => Promise<EditResult>;
+  rejectGroup: (proposalId: string) => Promise<EditResult>;
 };

@@ -61,3 +61,17 @@ export const EVIDENCE_LIMITS = {
   excerptMaxChars: 300,
   titleMaxChars: 100,
 } as const;
+
+/** 상향식 묶기 제안(PLAN 36): 같은 부모 아래 같은 종류의 형제가 이만큼 쌓이면 새 상위 노드를 제안할 수 있다 */
+export const GROUP_LIMITS = {
+  minSiblings: 4,
+  /** 한 묶음에 넣을 수 있는 노드 수 */
+  minChildren: 2,
+  maxChildren: 8,
+  /** 한 번 실행에서 만드는 제안 수(비용 한도) */
+  maxProposalsPerRun: 3,
+  /** 한 번 실행에서 Claude에게 보여 주는 묶음 후보(부모+종류) 수 */
+  maxBucketsPerRun: 3,
+  /** Claude에게 보내는 노드 수(한 후보당) */
+  maxNodesPerBucket: 30,
+} as const;

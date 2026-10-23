@@ -8,18 +8,20 @@ function check(error: { code?: string } | null, what: string): void {
 }
 
 export async function loadNodeData(client: SupabaseClient): Promise<NodeData> {
-  const [nodes, fields, evidence, outputs, suggestions] = await Promise.all([
+  const [nodes, fields, evidence, outputs, suggestions, proposals] = await Promise.all([
     client.from("nodes").select("id, parent_id, kind, name, description, start_date, end_date, portfolio_status, locked_fields, result_state, sort_order, created_by, deleted_at, updated_at"),
     client.from("node_fields").select("node_id, field, text, subject, locked, updated_by"),
     client.from("evidence").select("id, node_id, field, conversation_title, conversation_date, excerpt").order("created_at"),
     client.from("outputs").select("id, node_id, name, url, storage_path, is_final").order("created_at"),
     client.from("field_suggestions").select("id, node_id, field, text, subject, evidence, created_at").eq("status", "proposed").order("created_at"),
+    client.from("group_proposals").select("id, child_node_ids, suggested_name, suggested_kind, created_at").eq("status", "proposed").order("created_at"),
   ]);
   check(nodes.error, "노드 읽기");
   check(fields.error, "항목 읽기");
   check(evidence.error, "근거 읽기");
   check(outputs.error, "산출물 읽기");
   check(suggestions.error, "제안 읽기");
+  check(proposals.error, "묶기 제안 읽기");
   return {
     nodes: (nodes.data ?? []).map((r) => ({
       id: r.id, parentId: r.parent_id, kind: r.kind, name: r.name, description: r.description, startDate: r.start_date, endDate: r.end_date,
@@ -29,5 +31,6 @@ export async function loadNodeData(client: SupabaseClient): Promise<NodeData> {
     evidence: (evidence.data ?? []).map((r) => ({ id: r.id, nodeId: r.node_id, field: r.field, conversationTitle: r.conversation_title, conversationDate: r.conversation_date, excerpt: r.excerpt })),
     outputs: (outputs.data ?? []).map((r) => ({ id: r.id, nodeId: r.node_id, name: r.name, url: r.url, storagePath: r.storage_path, isFinal: r.is_final })),
     suggestions: (suggestions.data ?? []).map((r) => ({ id: r.id, nodeId: r.node_id, field: r.field, text: r.text, subject: r.subject, evidence: Array.isArray(r.evidence) ? r.evidence : [], createdAt: r.created_at })),
+    proposals: (proposals.data ?? []).map((r) => ({ id: r.id, childIds: r.child_node_ids ?? [], name: r.suggested_name, kind: r.suggested_kind, createdAt: r.created_at })),
   };
 }

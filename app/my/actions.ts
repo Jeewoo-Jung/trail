@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { createClaudeGroupAdvisor } from "@/lib/claude/group-advisor";
+import { approveGroupProposal, generateGroupProposals, rejectGroupProposal } from "@/lib/my/group-proposals";
 import * as edit from "@/lib/my/node-edit";
 import type { EditResult } from "@/lib/my/node-edit";
 import { createClient } from "@/lib/supabase/server";
@@ -103,4 +105,22 @@ export async function mergeActivitiesAction(keepId: string, otherId: string): Pr
 }
 export async function splitActivityAction(nodeId: string, name: string, fields: string[], children: string[]): Promise<EditResult> {
   return guard(z.object({ id, n: z.string().max(300), f: z.array(z.string().max(40)).max(10), c: z.array(id).max(100) }), { id: nodeId, n: name, f: fields, c: children }, (v) => run((c) => edit.splitActivity(c, v.id, v.n, v.f, v.c)));
+}
+
+// ───── 상향식 묶기 제안 ─────
+// 제안은 내가 버튼을 눌렀을 때만 만든다. Claude API 키가 없으면 이 기능만 꺼지고 나머지는 그대로 동작한다.
+export async function requestGroupsAction(): Promise<EditResult> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { ok: false, message: "Claude API 키가 없어 묶기 제안을 만들 수 없습니다. 나머지 기능은 그대로 쓸 수 있어요." };
+  return run(async (c) => {
+    const result = await generateGroupProposals(c, createClaudeGroupAdvisor(apiKey));
+    if (result.skipped === "no-candidates") return { ok: true, message: "아직 묶을 만한 노드가 없습니다. 같은 위치에 같은 종류의 노드가 4개 이상 쌓이면 제안해 드려요." };
+    return { ok: true, message: result.created > 0 ? `묶기 제안 ${result.created}개를 만들었습니다.` : "이번에는 묶을 만한 조합을 찾지 못했습니다." };
+  });
+}
+export async function approveGroupAction(proposalId: string, name: string): Promise<EditResult> {
+  return guard(z.object({ id, n: z.string().max(300) }), { id: proposalId, n: name }, (v) => run((c) => approveGroupProposal(c, v.id, v.n)));
+}
+export async function rejectGroupAction(proposalId: string): Promise<EditResult> {
+  return guard(id, proposalId, (v) => run((c) => rejectGroupProposal(c, v)));
 }

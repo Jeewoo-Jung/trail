@@ -30,6 +30,7 @@ export function NodeDetail({ tree, data, node, actions, onSelect }: Props) {
     <article className="flex flex-col gap-4" aria-label={`${node.name} 상세`}>
       <header className="flex flex-col gap-1">
         <p className="text-xs text-subtle">{node.path.join(" › ")}</p>
+        {actions && <ExcludeToggle node={node} actions={actions} />}
         <div className="flex flex-wrap items-center gap-2">
           <Badge>{NODE_KIND_LABEL[node.kind]}</Badge>
           <Badge tone={node.portfolioStatus === "excluded" ? "warn" : "neutral"}>{PORTFOLIO_LABEL[node.portfolioStatus]}</Badge>
@@ -53,6 +54,30 @@ export function NodeDetail({ tree, data, node, actions, onSelect }: Props) {
 
       {actions && <NodeActionsBar tree={tree} node={node} actions={actions} onSelect={onSelect} />}
     </article>
+  );
+}
+
+/** 빠른 제외: 삭제가 아니라 상태다. 제외하면 아래 노드도 문서·내려받기에서 빠지고(자식만 따로 제외해도 된다), 해제하면 소재 후보로 돌아온다. */
+function ExcludeToggle({ node, actions }: { node: TreeNode; actions: NodeActions }) {
+  const act = useAction();
+  const below = (n: TreeNode): number => n.children.reduce((s, c) => s + 1 + below(c), 0);
+  const excluded = node.portfolioStatus === "excluded";
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-sm">
+      <button type="button" disabled={act.pending} className={buttonClass.secondary} onClick={() => act.run(() => actions.update(node.id, { portfolioStatus: excluded ? "candidate" : "excluded" }))}>
+        {excluded ? "제외 해제" : "제외하기"}
+      </button>
+      <span className="text-xs text-muted">
+        {excluded
+          ? "제외 상태입니다. 문서·내려받기에서 빠지고 Claude도 여기에 기록하지 않습니다."
+          : node.effectiveExcluded
+            ? "상위 노드가 제외되어 함께 빠져 있습니다. 이 노드만 제외 해제하려면 상위의 제외를 풀어 주세요."
+            : below(node) > 0
+              ? `제외하면 아래 ${below(node)}개도 함께 빠집니다(삭제는 아닙니다).`
+              : "삭제가 아니라 상태입니다. 언제든 해제할 수 있습니다."}
+      </span>
+      <Message message={act.message} />
+    </div>
   );
 }
 

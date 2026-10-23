@@ -124,6 +124,34 @@ describe("recordActivities: 기존 활동에 이어붙이기(병합)", () => {
   });
 });
 
+describe("recordActivities: 제외된 노드", () => {
+  it("제외된 활동(또는 제외된 조상 아래)에는 이어붙이지도, 새로 만들지도 않는다", async () => {
+    const store = new FakeNodeStore();
+    const excludedProject = store.addNode({ kind: "project", name: "제외 프로젝트", portfolioStatus: "excluded" });
+    const underExcluded = store.addNode({ kind: "activity", name: "제외 아래 활동", parentId: excludedProject.id });
+    const okProject = store.addNode({ kind: "project", name: "정상 프로젝트" });
+    const excludedActivity = store.addNode({ kind: "activity", name: "제외 활동", parentId: okProject.id, portfolioStatus: "excluded" });
+    const normal = store.addNode({ kind: "activity", name: "정상 활동", parentId: okProject.id });
+    const out = ok(await recordActivities(store, { activities: [
+      { nodeId: underExcluded.id, fields: { task: fld("과제") } },
+      { nodeId: excludedActivity.id, fields: { task: fld("과제") } },
+      { name: "새 활동", parentId: excludedProject.id },
+      { nodeId: normal.id, fields: { task: fld("과제") } },
+    ] }));
+    expect(out.results.map((r) => r.status)).toEqual(["rejected", "rejected", "rejected", "updated"]);
+    expect(out.results[0].reasons?.[0]).toContain("제외된 노드");
+    expect(store.fields.get(underExcluded.id)).toBeUndefined();
+    expect(store.nodes.filter((n) => n.name === "새 활동")).toHaveLength(0);
+  });
+  it("제외를 풀면(후보) 다시 이어붙일 수 있다", async () => {
+    const store = new FakeNodeStore();
+    const a = store.addNode({ kind: "activity", name: "활동", portfolioStatus: "excluded" });
+    expect(ok(await recordActivities(store, { activities: [{ nodeId: a.id }] })).results[0].status).toBe("rejected");
+    a.portfolioStatus = "candidate";
+    expect(ok(await recordActivities(store, { activities: [{ nodeId: a.id }] })).results[0].status).toBe("updated");
+  });
+});
+
 describe("recordActivities: 산출물·대화·질문", () => {
   it("산출물 링크는 http(s)만, 같은 것은 중복 없이, 한 번에 5개까지", async () => {
     const store = new FakeNodeStore();

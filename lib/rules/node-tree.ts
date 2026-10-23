@@ -23,9 +23,12 @@ export type EvidenceRow = Evidence & { id: string; nodeId: string; field: StarFi
 export type OutputRow = { id: string; nodeId: string; name: string; url: string | null; storagePath: string | null; isFinal: boolean };
 export type SuggestionRow = { id: string; nodeId: string; field: StarField; text: string; subject: Subject; evidence: Evidence[]; createdAt: string };
 
+/** 처리를 기다리는 상향식 묶기 제안 */
+export type GroupProposalRow = { id: string; childIds: string[]; name: string; kind: "category" | "project"; createdAt: string };
+
 /** 화면에 한 번에 넘기는 전체 데이터 */
-export type NodeData = { nodes: NodeRow[]; fields: FieldRow[]; evidence: EvidenceRow[]; outputs: OutputRow[]; suggestions: SuggestionRow[] };
-export const EMPTY_DATA: NodeData = { nodes: [], fields: [], evidence: [], outputs: [], suggestions: [] };
+export type NodeData = { nodes: NodeRow[]; fields: FieldRow[]; evidence: EvidenceRow[]; outputs: OutputRow[]; suggestions: SuggestionRow[]; proposals: GroupProposalRow[] };
+export const EMPTY_DATA: NodeData = { nodes: [], fields: [], evidence: [], outputs: [], suggestions: [], proposals: [] };
 
 export type TreeNode = NodeRow & {
   children: TreeNode[];
