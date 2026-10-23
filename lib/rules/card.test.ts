@@ -184,8 +184,8 @@ describe("개념어 7개", () => {
   });
 });
 
-describe("분류 후보 3개", () => {
-  const candidate = (top: string, sub: string | null = null, isNewSub?: boolean) => ({ top, sub, isNewSub });
+describe("분류 후보 3개 (개념 경로)", () => {
+  const candidate = (...path: string[]) => ({ path });
 
   it("3개는 통과, 4개는 거절한다", () => {
     const three = [candidate("연구"), candidate("업무"), candidate("생활")];
@@ -193,27 +193,34 @@ describe("분류 후보 3개", () => {
     expect(rejected({ ...base, candidates: [...three, candidate("기타")] })[0].field).toBe("candidates");
   });
 
-  it("하위 개념이 없거나 비어 있으면 null로 정리하고, 신규 표시는 기본이 아님이다", () => {
-    const card = ok({
-      ...base,
-      candidates: [{ top: " 연구 " }, { top: "업무", sub: "  " }, { top: "생활", sub: " 요리 " }],
-    });
+  it("경로를 정리하고(공백·빈 이름 제거), 새 개념 표시는 기본이 아님이다", () => {
+    const card = ok({ ...base, candidates: [{ path: [" 연구 ", "  ", "임베딩"] }, { path: ["업무"], isNew: true }] });
     expect(card.candidates).toEqual([
-      { top: "연구", sub: null, isNewSub: false },
-      { top: "업무", sub: null, isNewSub: false },
-      { top: "생활", sub: "요리", isNewSub: false },
+      { path: ["연구", "임베딩"], isNew: false },
+      { path: ["업무"], isNew: true },
     ]);
   });
 
-  it("상위 개념이 비어 있으면 몇 번째인지 알려 주며 거절한다", () => {
+  it("옛 모양({ top, sub, isNewSub })도 경로로 바꿔 받는다", () => {
+    const card = ok({ ...base, candidates: [{ top: " 연구 " }, { top: "업무", sub: "  " }, { top: "생활", sub: " 요리 ", isNewSub: true }] });
+    expect(card.candidates).toEqual([
+      { path: ["연구"], isNew: false },
+      { path: ["업무"], isNew: false },
+      { path: ["생활", "요리"], isNew: true },
+    ]);
+  });
+
+  it("경로가 비어 있으면 몇 번째인지 알려 주며 거절한다", () => {
     const issues = rejected({ ...base, candidates: [candidate("연구"), candidate("  ")] });
-    expect(issues[0].field).toBe("candidates.1.top");
+    expect(issues[0].field).toBe("candidates.1.path");
     expect(issues[0].message).toContain("2번째");
   });
 
-  it("신규 하위 개념이라면서 이름이 없으면 거절한다", () => {
-    expect(rejected({ ...base, candidates: [candidate("연구", null, true)] })[0].field).toBe("candidates.0.sub");
-    expect(ok({ ...base, candidates: [candidate("연구", "신규 이름", true)] }).candidates[0].isNewSub).toBe(true);
+  it("5단계를 넘는 경로와 30자를 넘는 개념 이름은 거절한다", () => {
+    expect(ok({ ...base, candidates: [candidate("1", "2", "3", "4", "5")] }).candidates).toHaveLength(1);
+    expect(rejected({ ...base, candidates: [candidate("1", "2", "3", "4", "5", "6")] })[0].message).toContain("5단계");
+    expect(rejected({ ...base, candidates: [candidate("가".repeat(31))] })[0].message).toContain("30자");
+    expect(ok({ ...base, candidates: [candidate("가".repeat(30))] }).candidates).toHaveLength(1);
   });
 });
 

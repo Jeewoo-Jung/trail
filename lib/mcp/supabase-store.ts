@@ -2,7 +2,8 @@
 // 로그인한 사람의 연결(client)을 받아서 쓰므로, 모든 읽기·쓰기에 "내 행만" 규칙(RLS)이 그대로 걸린다.
 // 오류에는 어떤 일이었는지와 코드만 담는다. 데이터베이스 오류 문구에는 카드 내용이 섞일 수 있어서 옮기지 않는다.
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ClassificationCandidate } from "../rules/card";
+import { type ClassificationCandidate, normalizeStoredCandidate } from "../rules/card";
+import { type ConceptRef, listConceptPaths } from "../rules/classification";
 import { cleanTopicList } from "../rules/topic";
 import {
   type CardContent,
@@ -31,7 +32,7 @@ function toStoredCard(row: Row): StoredCard {
     summary: String(row.summary ?? ""),
     keywords: Array.isArray(row.keywords) ? (row.keywords as string[]) : [],
     evidence: Array.isArray(row.evidence) ? (row.evidence as string[]) : [],
-    candidates: Array.isArray(row.candidates) ? (row.candidates as ClassificationCandidate[]) : [],
+    candidates: Array.isArray(row.candidates) ? (row.candidates as unknown[]).map(normalizeStoredCandidate).filter((c): c is ClassificationCandidate => c !== null) : [],
     projectTopic: typeof row.project_topic === "string" ? row.project_topic : null,
   };
 }
@@ -150,22 +151,10 @@ export function createSupabaseCardStore(client: SupabaseClient): CardStore {
     },
 
     async listConcepts(): Promise<ConceptLists> {
-      const top = await client.from("top_concepts").select("name").order("sort_order").order("name");
-      check(top.error, "상위 개념 읽기");
-      const sub = await client
-        .from("sub_concepts")
-        .select("name, top_concepts(name)")
-        .eq("status", "approved")
-        .order("name");
-      check(sub.error, "하위 개념 읽기");
-      return {
-        topConcepts: (top.data ?? []).map((row) => row.name),
-        approvedSubConcepts: (sub.data ?? []).flatMap((row) => {
-          const parent = row.top_concepts as unknown as { name: string } | { name: string }[] | null;
-          const topName = Array.isArray(parent) ? parent[0]?.name : parent?.name;
-          return topName ? [{ top: topName, name: row.name }] : [];
-        }),
-      };
+      const { data, error } = await client.from("concepts").select("id, parent_id, name, status");
+      check(error, "개념 읽기");
+      const refs: ConceptRef[] = (data ?? []).map((r) => ({ id: r.id, parentId: r.parent_id, name: r.name, status: r.status }));
+      return { concepts: listConceptPaths(refs).map((p) => ({ path: p.path, status: p.status })) };
     },
   };
   return store;

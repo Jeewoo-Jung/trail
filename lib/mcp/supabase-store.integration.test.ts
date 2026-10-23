@@ -69,8 +69,7 @@ describe.skipIf(!enabled)("Supabase 저장소 (실제 로그인으로 시험)", 
     const outcome = await listCards(store, {});
     if (!outcome.ok) throw new Error("조회 실패");
     expect(outcome.output.cards).toEqual([]);
-    expect(Array.isArray(outcome.output.topConcepts)).toBe(true);
-    expect(Array.isArray(outcome.output.approvedSubConcepts)).toBe(true);
+    expect(Array.isArray(outcome.output.concepts)).toBe(true);
     expect(Array.isArray(outcome.output.excludedTopics)).toBe(true);
   });
 

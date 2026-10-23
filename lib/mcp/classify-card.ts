@@ -1,13 +1,13 @@
 // Design Ref: DESIGN.md §4.1 ⑧⑨, §4.5 — 카드를 Claude로 분류해 저장한다. 실패하면 "미분류(대기)"로 두고 기록은 막지 않는다.
 // 서버 로그에는 카드 내용을 남기지 않는다(여기서는 아예 로그를 쓰지 않고 결과 종류만 돌려준다).
-import { decideClassification } from "../rules/classification";
+import { listConceptPaths, resolveClassification } from "../rules/classification";
 import type { CardForClassification, ClassifyStore } from "./classify-store";
 
-/** Claude 호출을 대신하는 함수. 분류 값(JSON 모양)을 돌려주고, 한도·오류면 던진다. */
+/** Claude 호출을 대신하는 함수. 개념 경로(JSON 모양)를 돌려주고, 한도·오류면 던진다. */
 export type Classifier = (input: {
   card: CardForClassification;
-  topConcepts: string[];
-  approvedSubConcepts: { top: string; name: string }[];
+  /** 지금 있는 개념의 경로(거절된 것 제외) */
+  concepts: { path: string[]; status: "approved" | "proposed" }[];
 }) => Promise<unknown>;
 
 export type ClassifyOutcome = "done" | "waiting" | "missing";
@@ -18,20 +18,14 @@ export async function classifyCard(store: ClassifyStore, classifier: Classifier,
   const card = await store.getCard(cardId);
   if (!card) return "missing";
   try {
-    const [tops, subs] = await Promise.all([store.listTopConcepts(), store.listSubConcepts()]);
-    const topName = new Map(tops.map((t) => [t.id, t.name]));
-    const raw = await classifier({
-      card,
-      topConcepts: tops.map((t) => t.name),
-      approvedSubConcepts: subs.flatMap((s) => (s.status === "approved" && topName.has(s.topId) ? [{ top: topName.get(s.topId)!, name: s.name }] : [])),
-    });
-    // 규칙에 맞지 않는 출력(목록 밖 상위 개념 등)은 새 상위 개념을 만들지 않고 "미분류"로 확정한다.
+    const concepts = await store.listConcepts();
+    const raw = await classifier({ card, concepts: listConceptPaths(concepts).map((p) => ({ path: p.path, status: p.status })) });
+    // 규칙에 맞지 않는 출력(모양이 다르거나 한도를 넘는 이름)은 새 개념을 만들지 않고 "미분류"로 확정한다.
     // 한도 오류처럼 "대기"로 두면, 같은 이상한 출력이 반복될 때 뒤의 대기 카드까지 다시 분류되지 못하고 비용만 나간다.
-    const decision = decideClassification(raw, tops, subs) ?? { topId: null, sub: null };
-    let subId: string | null = null;
-    if (decision.sub?.kind === "existing") subId = decision.sub.id;
-    else if (decision.sub?.kind === "propose" && decision.topId) subId = await store.createSubProposal(decision.topId, decision.sub.name);
-    await store.saveClassification(cardId, decision.topId, subId);
+    const resolution = resolveClassification(raw, concepts);
+    let conceptId = resolution.existingId;
+    for (const name of resolution.create) conceptId = await store.createConcept(conceptId, name);
+    await store.saveClassification(cardId, conceptId);
     return "done";
   } catch {
     await store.markWaiting(cardId);

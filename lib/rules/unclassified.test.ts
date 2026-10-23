@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { unclassifiedRatio, type RatioInput } from "./unclassified";
 
 const make = (done: number, unclassified: number, extra: RatioInput[] = []): RatioInput[] => [
-  ...Array.from({ length: done - unclassified }, () => ({ status: "done" as const, topName: "연구" })),
-  ...Array.from({ length: unclassified }, () => ({ status: "done" as const, topName: null })),
+  ...Array.from({ length: done - unclassified }, () => ({ status: "done" as const, path: ["연구"] })),
+  ...Array.from({ length: unclassified }, () => ({ status: "done" as const, path: [] })),
   ...extra,
 ];
 
@@ -18,8 +18,8 @@ describe("unclassifiedRatio", () => {
     expect(unclassifiedRatio(make(9, 9)).warn).toBe(false);
   });
   it("분류 중·대기 카드는 세지 않는다", () => {
-    const waiting = Array.from({ length: 20 }, () => ({ status: "waiting" as const, topName: null }));
-    const pending = [{ status: "pending" as const, topName: null }];
+    const waiting = Array.from({ length: 20 }, () => ({ status: "waiting" as const, path: [] }));
+    const pending = [{ status: "pending" as const, path: [] }];
     expect(unclassifiedRatio(make(10, 1, [...waiting, ...pending]))).toMatchObject({ done: 10, unclassified: 1, warn: false });
   });
   it("카드가 없으면 0", () => {

@@ -8,6 +8,15 @@ export const CARD_LIMITS = {
   candidatesMaxCount: 3,
 } as const;
 
+/** 개념 트리의 한도. 단계·이름 길이는 데이터베이스에도 같은 한도가 걸려 있다(supabase/migrations/…_concept_tree.sql). */
+export const CONCEPT_LIMITS = {
+  /** 뿌리(상위 개념)를 1단계로 센 최대 단계 수 */
+  maxDepth: 5,
+  nameMaxChars: 30,
+  /** 사용자 한 명이 가질 수 있는 개념 수(제안·거절 포함). 분류가 끝없이 가지를 늘리는 것을 막는다 */
+  maxTotal: 300,
+} as const;
+
 /** 한 대화에서 만들 수 있는 카드 수. 데이터베이스에도 같은 한도가 걸려 있다. (supabase/migrations) */
 export const CARDS_PER_CONVERSATION_MAX = 10;
 

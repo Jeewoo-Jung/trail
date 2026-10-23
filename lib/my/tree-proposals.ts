@@ -3,47 +3,63 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Advisor } from "../claude/tree-advisor";
 import { StoreError } from "../mcp/store";
-import { hasProposalCandidates, parseAdvice, type SubContext, type TreeProposal } from "../rules/tree-proposals";
+import { hasProposalCandidates, parseAdvice, type ConceptContext, type TreeProposal } from "../rules/tree-proposals";
 
 function check(error: { code?: string } | null, what: string): void {
   if (error) throw new StoreError(what, error.code);
 }
 
-export async function loadSubContexts(client: SupabaseClient): Promise<SubContext[]> {
-  const [tops, subs, cards] = await Promise.all([
-    client.from("top_concepts").select("id, name"),
-    client.from("sub_concepts").select("id, top_concept_id, name, status"),
-    client.from("cards").select("id, title, sub_concept_id").not("sub_concept_id", "is", null),
+export async function loadConceptContexts(client: SupabaseClient): Promise<ConceptContext[]> {
+  const [concepts, cards] = await Promise.all([
+    client.from("concepts").select("id, parent_id, name, status, depth"),
+    client.from("cards").select("id, title, concept_id").not("concept_id", "is", null),
   ]);
-  check(tops.error, "상위 개념 읽기");
-  check(subs.error, "하위 개념 읽기");
+  check(concepts.error, "개념 읽기");
   check(cards.error, "카드 읽기");
-  const topName = new Map((tops.data ?? []).map((t) => [t.id, t.name as string]));
-  return (subs.data ?? []).map((s) => ({
-    id: s.id,
-    topId: s.top_concept_id,
-    topName: topName.get(s.top_concept_id) ?? "",
-    name: s.name,
-    status: s.status,
-    cards: (cards.data ?? []).filter((c) => c.sub_concept_id === s.id).map((c) => ({ id: c.id, title: c.title })),
-  }));
+  const rows = concepts.data ?? [];
+  const byId = new Map(rows.map((r) => [r.id as string, r]));
+  const pathOf = (id: string): string[] => {
+    const out: string[] = [];
+    let cur: string | null = id;
+    for (let i = 0; cur && i < 8; i += 1) {
+      const r = byId.get(cur);
+      if (!r) break;
+      out.unshift(r.name as string);
+      cur = r.parent_id as string | null;
+    }
+    return out;
+  };
+  return rows.map((r) => {
+    const kids = rows.filter((k) => k.parent_id === r.id);
+    return {
+      id: r.id,
+      parentId: r.parent_id,
+      name: r.name,
+      path: pathOf(r.id),
+      status: r.status,
+      depth: r.depth,
+      childCount: kids.filter((k) => k.status !== "rejected").length,
+      childNames: kids.map((k) => k.name as string),
+      cards: (cards.data ?? []).filter((c) => c.concept_id === r.id).map((c) => ({ id: c.id, title: c.title })),
+    };
+  });
 }
 
 export type GenerateResult = { created: number; skipped: "no-candidates" | null };
 
 /** 제안할 거리가 없으면 Claude를 부르지 않는다. */
 export async function generateProposals(client: SupabaseClient, advisor: Advisor): Promise<GenerateResult> {
-  const subs = await loadSubContexts(client);
-  if (!hasProposalCandidates(subs)) return { created: 0, skipped: "no-candidates" };
+  const concepts = await loadConceptContexts(client);
+  if (!hasProposalCandidates(concepts)) return { created: 0, skipped: "no-candidates" };
 
   const existing = await client.from("tree_proposals").select("signature");
   check(existing.error, "기존 제안 읽기");
   const known = new Set((existing.data ?? []).map((r) => r.signature as string));
 
-  const proposals = parseAdvice(await advisor(subs), subs, known);
+  const proposals = parseAdvice(await advisor(concepts), concepts, known);
   if (proposals.length === 0) return { created: 0, skipped: null };
   const { error } = await client.from("tree_proposals").upsert(
-    proposals.map((p) => ({ kind: p.kind, top_concept_id: p.topId, signature: p.signature, payload: p.payload })),
+    proposals.map((p) => ({ kind: p.kind, parent_concept_id: p.parentId, signature: p.signature, payload: p.payload })),
     { onConflict: "user_id,signature", ignoreDuplicates: true },
   );
   check(error, "제안 저장");

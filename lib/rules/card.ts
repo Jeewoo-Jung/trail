@@ -3,13 +3,14 @@
 //  - 근거 발췌가 0개인 카드는 거절하지 않고 요약을 비워서 저장한다("근거 없음").
 //  - "(추정)"은 Claude가 붙인 표기를 앱이 찾아서 보여 주기만 한다. 근거 여부는 코드가 판정하지 못한다.
 import { z } from "zod";
-import { CARD_LIMITS, ESTIMATE_MARKER } from "./limits";
+import { CARD_LIMITS, CONCEPT_LIMITS, ESTIMATE_MARKER } from "./limits";
 
-const candidateInputSchema = z.object({
-  top: z.string(),
-  sub: z.string().nullable().optional(),
-  isNewSub: z.boolean().optional(),
-});
+// 분류 후보는 뿌리에서 내려가는 경로다(예: ["취업준비", "자기소개서"]). 새 개념이면 isNew를 true로 한다.
+// 옛 모양({ top, sub, isNewSub })도 받아서 경로로 바꾼다.
+const candidateInputSchema = z.union([
+  z.object({ path: z.array(z.string()), isNew: z.boolean().optional() }),
+  z.object({ top: z.string(), sub: z.string().nullable().optional(), isNewSub: z.boolean().optional() }),
+]);
 
 /** 모양(글자·배열 등)만 검사한다. 한도는 checkCard가 따로 본다. */
 export const cardInputSchema = z.object({
@@ -23,12 +24,20 @@ export const cardInputSchema = z.object({
   projectTopic: z.string().optional(),
 });
 
-/** 상위 개념 하나와 하위 개념(기존 것, 신규 제안, 또는 없음)의 짝 */
+/** 개념 트리 안의 한 자리: 뿌리부터 내려가는 이름들. 아직 없는 개념이면 isNew */
 export type ClassificationCandidate = {
-  top: string;
-  sub: string | null;
-  isNewSub: boolean;
+  path: string[];
+  isNew: boolean;
 };
+
+/** 저장돼 있던 분류 후보(옛 모양 { top, sub, isNewSub } 포함)를 경로 모양으로 바꾼다. 알아볼 수 없으면 null. */
+export function normalizeStoredCandidate(raw: unknown): ClassificationCandidate | null {
+  const parsed = candidateInputSchema.safeParse(raw);
+  if (!parsed.success) return null;
+  const c = parsed.data;
+  if ("path" in c) return { path: cleanList(c.path), isNew: c.isNew ?? false };
+  return { path: cleanList([c.top, c.sub ?? ""]), isNew: c.isNewSub ?? false };
+}
 
 export type CheckedCard = {
   cardId?: string;
@@ -137,12 +146,9 @@ export function checkCard(raw: unknown): CardCheckResult {
   }
 
   const candidates: ClassificationCandidate[] = (input.candidates ?? []).map((candidate) => {
+    if ("path" in candidate) return { path: cleanList(candidate.path), isNew: candidate.isNew ?? false };
     const sub = candidate.sub === undefined || candidate.sub === null ? "" : clean(candidate.sub);
-    return {
-      top: clean(candidate.top),
-      sub: sub === "" ? null : sub,
-      isNewSub: candidate.isNewSub ?? false,
-    };
+    return { path: cleanList([candidate.top, sub]), isNew: candidate.isNewSub ?? false };
   });
   if (candidates.length > CARD_LIMITS.candidatesMaxCount) {
     issues.push({
@@ -151,17 +157,12 @@ export function checkCard(raw: unknown): CardCheckResult {
     });
   }
   candidates.forEach((candidate, index) => {
-    if (candidate.top === "") {
-      issues.push({
-        field: `candidates.${index}.top`,
-        message: `분류 후보 ${index + 1}번째의 상위 개념이 비어 있습니다`,
-      });
-    }
-    if (candidate.isNewSub && candidate.sub === null) {
-      issues.push({
-        field: `candidates.${index}.sub`,
-        message: `분류 후보 ${index + 1}번째가 신규 하위 개념인데 이름이 없습니다`,
-      });
+    if (candidate.path.length === 0) {
+      issues.push({ field: `candidates.${index}.path`, message: `분류 후보 ${index + 1}번째의 경로가 비어 있습니다` });
+    } else if (candidate.path.length > CONCEPT_LIMITS.maxDepth) {
+      issues.push({ field: `candidates.${index}.path`, message: `분류 후보 ${index + 1}번째의 경로가 ${CONCEPT_LIMITS.maxDepth}단계를 넘습니다 (현재 ${candidate.path.length}단계)` });
+    } else if (candidate.path.some((name) => countChars(name) > CONCEPT_LIMITS.nameMaxChars)) {
+      issues.push({ field: `candidates.${index}.path`, message: `분류 후보 ${index + 1}번째의 개념 이름이 ${CONCEPT_LIMITS.nameMaxChars}자를 넘습니다` });
     }
   });
 

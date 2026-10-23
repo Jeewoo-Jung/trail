@@ -2,7 +2,7 @@
 // 이 대화의 기존 카드, 고를 수 있는 개념, 제외 주제를 알려 줘서 중복 카드와 엉뚱한 분류를 줄인다.
 import { z } from "zod";
 import { cleanTopicList } from "../rules/topic";
-import type { CardStore, CardSummary, ConceptLists } from "./store";
+import type { CardStore, CardSummary } from "./store";
 
 export const listInputSchema = z.object({
   conversationKey: z.uuid().optional(),
@@ -12,8 +12,8 @@ export type ListOutput = {
   conversationKey: string | null;
   /** id·주제 키·제목만 담는다. 요약과 근거는 돌려주지 않는다. */
   cards: CardSummary[];
-  topConcepts: ConceptLists["topConcepts"];
-  approvedSubConcepts: ConceptLists["approvedSubConcepts"];
+  /** 지금 있는 개념의 경로(승인된 것과 제안 중인 것). 맞는 개념이 있으면 그 경로를 쓰고, 없으면 새 경로를 만들어도 된다. */
+  concepts: { path: string; status: "approved" | "proposed" }[];
   excludedTopics: string[];
   /** 내가 정한 프로젝트 주제. 여기 있는 주제의 결정은 묻지 않고 기록한다. 비어 있으면 아직 정하지 않은 것이다. */
   projectTopics: string[];
@@ -43,8 +43,7 @@ export async function listCards(store: CardStore, rawInput: unknown): Promise<Li
     output: {
       conversationKey: conversationKey ?? null,
       cards,
-      topConcepts: concepts.topConcepts,
-      approvedSubConcepts: concepts.approvedSubConcepts,
+      concepts: concepts.concepts.map((c) => ({ path: c.path.join(" > "), status: c.status })),
       excludedTopics: cleanTopicList([...exclusions.alwaysExcluded, ...exclusions.blocked]),
       projectTopics: cleanTopicList(projectTopics),
     },

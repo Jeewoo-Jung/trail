@@ -43,7 +43,7 @@ const cardShape = z.looseObject({
   summary: z.unknown().optional().describe("문자열, 500자 이하. 근거로 확인되지 않는 문장 끝에는 (추정)을 붙인다. 근거가 없으면 비워 둔다."),
   keywords: z.unknown().optional().describe("문자열 배열, 최대 7개."),
   evidence: z.unknown().optional().describe("문자열 배열, 최대 3개, 각 300자 이하. 요약의 근거가 되는 발췌."),
-  candidates: z.unknown().optional().describe("최대 3개의 {top, sub, isNewSub} 분류 후보."),
+  candidates: z.unknown().optional().describe("최대 3개의 분류 후보 {path: [상위 개념, 하위 개념, …], isNew}. path는 list_cards의 concepts처럼 뿌리부터 내려가는 개념 이름 목록(최대 5단계, 각 30자 이하)이다. 맞는 개념이 없으면 새 이름을 이어 붙이거나 새 상위 개념부터 시작해도 되고, 새 개념이 있으면 isNew를 true로 한다."),
   cardId: z.unknown().optional().describe("문자열. list_cards로 얻은 카드 id. 그 카드를 갱신할 때만 쓴다."),
   projectTopic: z.unknown().optional().describe("문자열. 프로젝트 주제."),
 });
@@ -54,7 +54,7 @@ const handler = createMcpHandler(
       "list_cards",
       {
         title: "이 대화의 카드 조회",
-        description: "기록하기 전에 먼저 부른다. 이 대화에 이미 있는 카드(id·주제 키·제목), 상위·승인된 하위 개념 목록, 제외 주제 목록을 돌려준다.",
+        description: "기록하기 전에 먼저 부른다. 이 대화에 이미 있는 카드(id·주제 키·제목), 지금 있는 개념 트리의 경로 목록(concepts), 제외 주제 목록, 프로젝트 주제 목록을 돌려준다.",
         inputSchema: z.object({ conversationKey: z.string().optional().describe("대화 키. 처음 기록하는 대화면 비운다.") }),
       },
       async (input, ctx) => {

@@ -1,41 +1,67 @@
 import { describe, expect, it } from "vitest";
-import { buildGraph, fitTransform, groupColor, GROUP_COLORS, neighborsOf, nodeRadius, settleGraph, tickGraph, zoomAt } from "./graph-layout";
-import { buildTree, type CardRow, type SubRow, type TopRow } from "./tree";
+import { buildGraph, defaultCollapsedGraph, fitTransform, FOLD_CHILDREN, FOLD_TOTAL_NODES, groupColor, GROUP_COLORS, neighborsOf, nodeRadius, settleGraph, tickGraph, zoomAt } from "./graph-layout";
+import { buildTree, nodeKey, type CardRow, type ConceptRow } from "./tree";
 
-const tops: TopRow[] = [
-  { id: "t1", name: "연구", sortOrder: 0 },
-  { id: "t2", name: "업무", sortOrder: 1 },
-  { id: "t3", name: "생활", sortOrder: 2 },
+const k = (id: string, parentId: string | null, name: string, status: ConceptRow["status"] = "approved", sortOrder = 0): ConceptRow => ({ id, parentId, name, status, sortOrder });
+const card = (id: string, conceptId: string): CardRow => ({ id, title: id, summary: "요약", keywords: [], evidence: ["e"], candidates: [], conceptId, status: "done", createdAt: "2026-10-23T00:00:00Z" });
+
+// 연구(3단계까지) · 업무 · 생활(하위 2개)
+const concepts: ConceptRow[] = [
+  k("t1", null, "연구", "approved", 0), k("t1a", "t1", "임베딩"), k("t1a1", "t1a", "문장 임베딩"), k("t1b", "t1", "평가", "proposed"),
+  k("t2", null, "업무", "approved", 1), k("t2a", "t2", "회의"), k("t2b", "t2", "도구"),
+  k("t3", null, "생활", "approved", 2), k("t3a", "t3", "가계"), k("t3b", "t3", "운동", "proposed"),
 ];
-const mkSubs = (top: string, n: number): SubRow[] => Array.from({ length: n }, (_, i) => ({ id: `${top}-s${i}`, topId: top, name: `${top}하위${i}`, status: i === 1 ? ("proposed" as const) : ("approved" as const) }));
-const card = (id: string, topId: string, subId: string): CardRow => ({ id, title: id, summary: "요약", keywords: [], evidence: ["e"], candidates: [], topId, subId, status: "done", createdAt: "2026-10-23T00:00:00Z" });
-// 제안 중인 하위 개념(s1)에도 카드를 하나씩 둔다(카드가 없는 제안은 트리에서 숨겨지기 때문)
-const tree = buildTree([card("a", "t1", "t1-s0"), card("b", "t1", "t1-s1"), card("c", "t2", "t2-s0"), card("d", "t2", "t2-s1"), card("e", "t3", "t3-s1")], tops, [...mkSubs("t1", 4), ...mkSubs("t2", 3), ...mkSubs("t3", 2)]);
+// 제안 중인 개념에도 카드를 하나씩 둔다(카드가 없는 제안은 트리에서 숨겨지기 때문)
+const tree = buildTree([card("a", "t1a1"), card("b", "t1b"), card("c", "t2a"), card("d", "t3b")], concepts);
 
 describe("buildGraph", () => {
-  it("상위·하위 개념마다 점 하나, 하위마다 상위로 가는 선 하나를 만든다(루트 점은 없다)", () => {
+  it("보이는 개념마다 점 하나, 자식마다 부모로 가는 선 하나를 만든다(루트 점은 없다)", () => {
     const g = buildGraph(tree, new Set());
     expect(g.nodes.filter((n) => n.kind === "top").map((n) => n.label)).toEqual(["연구", "업무", "생활"]);
-    expect(g.nodes.filter((n) => n.kind === "sub")).toHaveLength(9);
-    expect(g.edges).toHaveLength(9);
+    expect(g.nodes.map((n) => n.depth)).toContain(3);
+    expect(g.edges).toHaveLength(g.nodes.length - 3); // 뿌리 3개를 뺀 나머지가 모두 부모에 이어진다
     expect(new Set(g.nodes.map((n) => n.id)).size).toBe(g.nodes.length);
   });
-  it("접은 상위 개념은 하위 점이 없고 숨은 개수를 알려 준다", () => {
-    const g = buildGraph(tree, new Set(["top:t1"]));
-    expect(g.nodes.find((n) => n.key === "top:t1")?.hidden).toBe(4);
-    expect(g.nodes.some((n) => n.key.startsWith("sub:t1-"))).toBe(false);
+  it("접은 개념은 그 아래를 모두 그리지 않고 숨은 개수를 알려 준다", () => {
+    const g = buildGraph(tree, new Set([nodeKey("t1")]));
+    const t1 = g.nodes.find((n) => n.key === nodeKey("t1"))!;
+    expect(t1.hidden).toBe(3); // 임베딩, 문장 임베딩, 평가
+    expect(g.nodes.some((n) => n.key === nodeKey("t1a1"))).toBe(false);
   });
-  it("같은 점은 이전 자리에서 이어 간다", () => {
+  it("같은 점은 이전 자리에서 이어 가고, 같은 뿌리 아래 점은 같은 그룹이다", () => {
     const first = buildGraph(tree, new Set());
     const prev = new Map(first.nodes.map((n) => [n.key, { x: n.x + 5, y: n.y + 7 }]));
     const again = buildGraph(tree, new Set(), prev);
     expect(again.nodes[0].x).toBe(first.nodes[0].x + 5);
+    expect(first.nodes.filter((n) => n.group === 0).map((n) => n.label).sort()).toEqual(["문장 임베딩", "연구", "임베딩", "평가"]);
   });
-  it("제안 중인 하위 개념을 표시하고, 카드가 많을수록 점이 커진다", () => {
-    const g = buildGraph(tree, new Set());
-    expect(g.nodes.filter((n) => n.proposed)).toHaveLength(3);
-    expect(nodeRadius("sub", 9)).toBeGreaterThan(nodeRadius("sub", 0));
-    expect(nodeRadius("top", 0)).toBeGreaterThan(nodeRadius("sub", 0));
+  it("제안 중인 개념을 표시하고, 카드가 많을수록·얕을수록 점이 크다", () => {
+    expect(buildGraph(tree, new Set()).nodes.filter((n) => n.proposed).map((n) => n.label).sort()).toEqual(["운동", "평가"]);
+    expect(nodeRadius(2, 9)).toBeGreaterThan(nodeRadius(2, 0));
+    expect(nodeRadius(1, 0)).toBeGreaterThan(nodeRadius(2, 0));
+    expect(nodeRadius(2, 0)).toBeGreaterThan(nodeRadius(4, 0));
+  });
+});
+
+describe("defaultCollapsedGraph", () => {
+  const wide = (n: number, parent = "w") => Array.from({ length: n }, (_, i) => k(`${parent}${i}`, parent === "w" ? null : parent, `이름${parent}${i}`));
+  it("작은 트리는 아무것도 접지 않는다", () => {
+    expect(defaultCollapsedGraph(tree)).toEqual(new Set());
+  });
+  it("자식이 기준보다 많은 개념은 접는다", () => {
+    const cs = [k("p", null, "넓은"), ...wide(FOLD_CHILDREN + 1, "p")];
+    const t = buildTree([], cs);
+    expect([...defaultCollapsedGraph(t)]).toEqual([nodeKey("p")]);
+  });
+  it("점이 너무 많으면 2단계 이하의 가지 있는 개념을 접는다", () => {
+    const roots = Array.from({ length: 6 }, (_, i) => k(`r${i}`, null, `뿌리${i}`));
+    const mids = roots.flatMap((r) => Array.from({ length: 6 }, (_, j) => k(`${r.id}m${j}`, r.id, `${r.name}중${j}`)));
+    const leaves = mids.map((m) => k(`${m.id}x`, m.id, `${m.name}끝`));
+    const t = buildTree([], [...roots, ...mids, ...leaves]);
+    expect(t.length + mids.length + leaves.length).toBeGreaterThan(FOLD_TOTAL_NODES);
+    const folded = defaultCollapsedGraph(t);
+    expect(folded.has(nodeKey(mids[0].id))).toBe(true);
+    expect(folded.has(nodeKey(roots[0].id))).toBe(false); // 뿌리는 열어 둔다
   });
 });
 
@@ -53,7 +79,7 @@ describe("힘 계산", () => {
     const g = settleGraph(buildGraph(tree, new Set()), 400);
     const by = new Map(g.nodes.map((n) => [n.id, n]));
     const linked = g.edges.map((e) => Math.hypot(by.get(e.source)!.x - by.get(e.target)!.x, by.get(e.source)!.y - by.get(e.target)!.y));
-    const a = by.get("sub:t1-s0")!; const b = by.get("sub:t3-s0")!;
+    const a = by.get(nodeKey("t1a1"))!; const b = by.get(nodeKey("t3a"))!;
     expect(Math.max(...linked)).toBeLessThan(Math.hypot(a.x - b.x, a.y - b.y));
   });
   it("같은 입력은 같은 결과가 나온다(무작위 없음)", () => {
@@ -77,9 +103,9 @@ describe("힘 계산", () => {
 });
 
 describe("보조 함수", () => {
-  it("이웃: 자기 자신과 선으로 이어진 점", () => {
+  it("이웃: 자기 자신과 선으로 이어진 점(부모와 자식)", () => {
     const g = buildGraph(tree, new Set());
-    expect([...neighborsOf(g, "top:t3")].sort()).toEqual(["sub:t3-s0", "sub:t3-s1", "top:t3"]);
+    expect([...neighborsOf(g, nodeKey("t1a"))].sort()).toEqual([nodeKey("t1"), nodeKey("t1a"), nodeKey("t1a1")].sort());
   });
   it("맞춤: 모든 점이 화면 안에 들어온다", () => {
     const g = settleGraph(buildGraph(tree, new Set()), 300);
@@ -95,7 +121,7 @@ describe("보조 함수", () => {
     expect(zoomAt({ k: 1, x: 0, y: 0 }, 100, 0, 0).k).toBe(3);
     expect(zoomAt({ k: 1, x: 0, y: 0 }, 0.001, 0, 0).k).toBe(0.2);
   });
-  it("색은 상위 개념마다 돌려 가며 쓴다", () => {
+  it("색은 뿌리마다 돌려 가며 쓴다", () => {
     expect(groupColor(0)).toBe(GROUP_COLORS[0]);
     expect(groupColor(GROUP_COLORS.length)).toBe(GROUP_COLORS[0]);
   });

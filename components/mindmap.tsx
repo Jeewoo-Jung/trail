@@ -6,14 +6,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CardItem } from "@/components/concept-tree";
 import { buildGraph, defaultCollapsedGraph, fitTransform, groupColor, neighborsOf, tickGraph, zoomAt, type Graph, type ViewTransform } from "@/lib/rules/graph-layout";
-import { cardsOfNode, type TopNode } from "@/lib/rules/tree";
+import { cardsOfNode, findNode, type ConceptNode } from "@/lib/rules/tree";
 
 // 화면 크기를 재기 전(첫 그림)에 쓰는 기본 크기. 실제 크기는 ResizeObserver가 잰다.
 const DEFAULT_W = 900;
 const DEFAULT_H = 640;
 type LabelMode = "auto" | "always" | "off";
 
-export function Mindmap({ tree }: { tree: TopNode[] }) {
+export function Mindmap({ tree }: { tree: ConceptNode[] }) {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => defaultCollapsedGraph(tree));
   const [selected, setSelected] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
@@ -154,7 +154,9 @@ export function Mindmap({ tree }: { tree: TopNode[] }) {
 
   const cards = cardsOfNode(tree, selected);
   const selectedNode = graph.nodes.find((n) => n.id === selected);
-  const selectedTop = tree.find((t) => t.key === selected && t.id !== null && t.subs.length > 0);
+  // 자식이 있는 개념을 고르면 접기/펼치기 버튼을 보여 준다(어느 단계든 접을 수 있다).
+  const foldable = selected ? findNode(tree, selected) : null;
+  const selectedTop = foldable && foldable.children.length > 0 ? foldable : null;
   const showLabel = (id: string) => {
     if (labels === "off") return false;
     if (labels === "always") return true;

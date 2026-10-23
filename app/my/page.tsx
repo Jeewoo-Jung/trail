@@ -14,7 +14,7 @@ import { unclassifiedRatio } from "@/lib/rules/unclassified";
 import { GenerateProposalsButton } from "@/components/generate-proposals-button";
 import { listPendingProposals } from "@/lib/my/tree-proposals";
 import { describeProposal } from "@/lib/rules/tree-proposals";
-import { approveSub, approveTreeProposal, deleteCard, rejectSub, rejectTreeProposal, requestTreeProposals } from "./actions";
+import { approveConcept, approveTreeProposal, deleteCard, rejectConcept, rejectTreeProposal, requestTreeProposals } from "./actions";
 
 export default function MyPage() {
   return (
@@ -62,7 +62,7 @@ async function SignedIn() {
     <section className="flex flex-col gap-6">
       {ratio.warn && (
         <p role="alert" className="rounded-2xl border border-warn/60 bg-warn/10 p-4 text-sm">
-          미분류 카드가 {Math.round(ratio.ratio * 100)}%입니다. 상위 개념을 다시 살펴보세요.
+          미분류 카드가 {Math.round(ratio.ratio * 100)}%입니다. 개념 트리를 다시 살펴보세요.
         </p>
       )}
       {proposals.length > 0 && (
@@ -70,17 +70,20 @@ async function SignedIn() {
           <h2 className="font-semibold">승인 대기 {proposals.length}</h2>
           <ul className="flex flex-col gap-2">
             {proposals.map((p) => (
-              <li key={p.subId} className="flex flex-wrap items-center justify-between gap-2">
+              <li key={p.conceptId} className="flex flex-wrap items-center justify-between gap-2">
                 <span>
-                  “{p.name}” <span className="text-subtle">({p.topName} &gt; 신규, 카드 {p.cardCount}장)</span>
+                  “{p.name}”{" "}
+                  <span className="text-subtle">
+                    ({p.parentPath.length > 0 ? `${p.parentPath.join(" > ")} 아래 신규` : "새 상위 개념"}, 카드 {p.cardCount}장{p.descendantCount > 0 ? `, 하위 ${p.descendantCount}개 포함` : ""})
+                  </span>
                 </span>
                 <span className="flex gap-2">
-                  <form action={approveSub}>
-                    <input type="hidden" name="sub_id" value={p.subId} />
+                  <form action={approveConcept}>
+                    <input type="hidden" name="concept_id" value={p.conceptId} />
                     <button type="submit" className="rounded-xl bg-brand hover:brightness-110 px-4 py-1 text-xs font-medium text-on-accent">승인</button>
                   </form>
-                  <form action={rejectSub}>
-                    <input type="hidden" name="sub_id" value={p.subId} />
+                  <form action={rejectConcept}>
+                    <input type="hidden" name="concept_id" value={p.conceptId} />
                     <button type="submit" className="rounded-xl border border-line hover:bg-surface-hover px-4 py-1 text-xs font-medium">거절</button>
                   </form>
                 </span>
@@ -97,7 +100,7 @@ async function SignedIn() {
           </form>
         </div>
         {treeProposals.length === 0 ? (
-          <p className="text-subtle">제안이 없습니다. 하위 개념이 쌓인 뒤 &quot;정리 제안 받기&quot;를 누르면 Claude가 병합·분리를 제안합니다. 승인하기 전에는 아무것도 바뀌지 않습니다.</p>
+          <p className="text-subtle">제안이 없습니다. 개념이 쌓인 뒤 &quot;정리 제안 받기&quot;를 누르면 Claude가 병합(같은 부모 아래 형제끼리)·분리(세부 개념으로 나누기)를 제안합니다. 승인하기 전에는 아무것도 바뀌지 않습니다.</p>
         ) : (
           <ul className="flex flex-col gap-3">
             {treeProposals.map((p) => (
@@ -122,7 +125,7 @@ async function SignedIn() {
           </ul>
         )}
       </section>
-      <ConceptTree tree={tree} deleteCard={deleteCard} approveSub={approveSub} rejectSub={rejectSub} />
+      <ConceptTree tree={tree} deleteCard={deleteCard} approveConcept={approveConcept} rejectConcept={rejectConcept} />
     </section>
   );
 }

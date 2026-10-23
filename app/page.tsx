@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { ConceptTree } from "@/components/concept-tree";
 import { buildTree } from "@/lib/rules/tree";
-import { SAMPLE_CARDS, SAMPLE_SUBS, SAMPLE_TOPS } from "@/lib/sample/sample-data";
+import { SAMPLE_CARDS, SAMPLE_CONCEPTS } from "@/lib/sample/sample-data";
 
 export default function Home() {
-  const tree = buildTree(SAMPLE_CARDS, SAMPLE_TOPS, SAMPLE_SUBS);
+  const tree = buildTree(SAMPLE_CARDS, SAMPLE_CONCEPTS);
   return (
     <>
       <div role="note" className="bg-warn/15 px-6 py-2 text-center text-sm font-medium text-warn">

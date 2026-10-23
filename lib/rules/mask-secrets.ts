@@ -83,8 +83,7 @@ export function maskCard(card: CheckedCard): { card: CheckedCard; maskedCount: n
     evidence: card.evidence.map(mask),
     candidates: card.candidates.map((candidate) => ({
       ...candidate,
-      top: mask(candidate.top),
-      sub: candidate.sub === null ? null : mask(candidate.sub),
+      path: candidate.path.map(mask),
     })),
     ...(card.projectTopic !== undefined ? { projectTopic: mask(card.projectTopic) } : {}),
     // 추정 문장 안에 비밀값이 있었다면 그대로 새어 나가지 않도록 가린 요약에서 다시 찾는다.

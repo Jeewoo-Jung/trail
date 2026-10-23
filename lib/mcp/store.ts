@@ -23,9 +23,9 @@ export type StoredCard = {
 export type CardSummary = { id: string; topicKey: string; title: string };
 export type ConversationInfo = { key: string; cardCount: number };
 export type Exclusions = { alwaysExcluded: string[]; blocked: string[] };
+/** 지금 있는 개념(거절된 것 제외)의 경로. Claude가 분류 후보를 고를 때 쓴다. */
 export type ConceptLists = {
-  topConcepts: string[];
-  approvedSubConcepts: { top: string; name: string }[];
+  concepts: { path: string[]; status: "approved" | "proposed" }[];
 };
 
 export interface CardStore {

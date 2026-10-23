@@ -8,8 +8,12 @@ const NOT_EXISTING_KEY = "11111111-1111-4111-8111-111111111111";
 function storeWithConcepts(): FakeStore {
   const store = new FakeStore();
   store.concepts = {
-    topConcepts: ["연구", "업무"],
-    approvedSubConcepts: [{ top: "연구", name: "임베딩" }],
+    concepts: [
+      { path: ["연구"], status: "approved" },
+      { path: ["연구", "임베딩"], status: "approved" },
+      { path: ["연구", "임베딩", "소형 모델"], status: "proposed" },
+      { path: ["업무"], status: "approved" },
+    ],
   };
   store.exclusions = { alwaysExcluded: ["비밀 주제"], blocked: ["개인 일기", "비밀주제"] };
   return store;
@@ -22,8 +26,12 @@ describe("listCards", () => {
     expect(outcome.output).toEqual({
       conversationKey: null,
       cards: [],
-      topConcepts: ["연구", "업무"],
-      approvedSubConcepts: [{ top: "연구", name: "임베딩" }],
+      concepts: [
+        { path: "연구", status: "approved" },
+        { path: "연구 > 임베딩", status: "approved" },
+        { path: "연구 > 임베딩 > 소형 모델", status: "proposed" },
+        { path: "업무", status: "approved" },
+      ],
       excludedTopics: ["비밀 주제", "개인 일기"],
       projectTopics: [],
     });

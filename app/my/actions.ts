@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { createClaudeAdvisor } from "@/lib/claude/tree-advisor";
-import { approveSubConcept, rejectSubConcept } from "@/lib/my/proposals";
+import { approveConcept as approveConceptRow, rejectConcept as rejectConceptRow } from "@/lib/my/proposals";
 import { approveProposal, generateProposals, rejectProposal } from "@/lib/my/tree-proposals";
 import { createClient } from "@/lib/supabase/server";
 
@@ -16,23 +16,27 @@ export async function logout() {
   redirect("/login");
 }
 
-// 새 하위 개념 승인·거절. 서버에서 다시 로그인을 확인하고, 제안 상태인 것만 바꾼다. 데이터베이스의 "내 행만" 규칙도 걸려 있다.
-async function decideSub(formData: FormData, approve: boolean) {
+// 새 개념(상위 개념 포함) 승인·거절. 가지째 처리한다. 서버에서 다시 로그인을 확인하고, 제안 상태인 것만 바꾼다. 데이터베이스의 "내 행만" 규칙도 걸려 있다.
+async function decideConcept(formData: FormData, approve: boolean) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  const id = formData.get("sub_id");
+  const id = formData.get("concept_id");
   if (typeof id !== "string" || !z.uuid().safeParse(id).success) return;
   const supabase = await createClient();
-  await (approve ? approveSubConcept : rejectSubConcept)(supabase, id);
+  try {
+    await (approve ? approveConceptRow : rejectConceptRow)(supabase, id);
+  } catch {
+    console.error("[my] 개념 승인·거절 실패");
+  }
   revalidatePath("/my");
 }
 
-export async function approveSub(formData: FormData) {
-  await decideSub(formData, true);
+export async function approveConcept(formData: FormData) {
+  await decideConcept(formData, true);
 }
 
-export async function rejectSub(formData: FormData) {
-  await decideSub(formData, false);
+export async function rejectConcept(formData: FormData) {
+  await decideConcept(formData, false);
 }
 
 // 잘못 기록된 카드 삭제. 카드 내용을 고치는 기능은 없고 삭제만 된다.
