@@ -49,7 +49,7 @@
 ## 2. 배포 단계에서 할 일 (보완점이 아니라 의도적으로 미룬 일)
 
 - PLAN 7 Vercel 배포, 환경변수 등록(`OWNER_USER_ID`는 비어 있으면 아무도 로그인하지 못함), PLAN 13 Claude에 커넥터 등록, PLAN 20의 공개 주소 점검, PLAN 24(쓰기 시작 약 2주 뒤 측정).
-- Supabase Site URL을 배포 주소로 바꾸고 허용 주소 목록을 정리한다. 현재 `http://localhost:3000`이다.
+- (완료 2026-10-23) Supabase Site URL을 `https://trail-pink-zeta.vercel.app`로 바꾸고 허용 주소 목록(배포 주소, localhost:3000·3001)을 정리했다. 승인 화면이 배포 주소로 돌아오는 것을 확인했다.
 - 지우님이 Anthropic 콘솔에서 월 한도 10달러를 건다(지금은 결제 5달러·자동결제 없음이 사실상 상한).
 - 가끔 `auth.oauth_clients`를 확인해 낯선 클라이언트를 지운다(현재 0개).
 - git 과거 기록에 비밀값·대화 파일이 들어간 적이 있는지는 현재 이력 전체를 확인했으며 `.env*`, `private-imports/`는 없었다. 이전 시도를 보관한 태그 `archive-before-restart`의 내용은 확인하지 못했다(지우기 전에 확인한다).
