@@ -1,7 +1,4 @@
 @import "tailwindcss";
-@import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
-@import "@fontsource-variable/noto-serif-kr/index.css";
-@import "@fontsource-variable/jetbrains-mono/index.css";
 
 /*
  * Trail 시각 디자인(DESIGN.md §12) — "따뜻한 차콜": 순수 검정·흰색 없이 따뜻한 회갈색 바탕에 테라코타 포인트 하나.
@@ -50,9 +47,8 @@
   --color-warn: var(--warn);
   --color-info: var(--info);
   --color-ok: var(--ok);
-  --font-sans: "Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
-  --font-serif: "Noto Serif KR Variable", "Noto Serif KR", "Apple Myungjo", serif;
-  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+  --font-sans: var(--font-inter-tight), "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+  --font-serif: var(--font-inter-tight), "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
   --radius-lg: 0.5rem;
   --radius-xl: 0.625rem; /* 버튼 */
   --radius-2xl: 0.75rem; /* 카드 */
@@ -60,16 +56,13 @@
 
 html {
   background: var(--canvas);
-  font-size: 15px;
 }
 
 body {
   background: var(--canvas);
   color: var(--fg);
   font-family: var(--font-sans);
-  line-height: 1.65;
-  letter-spacing: -0.01em;
-  word-break: keep-all; /* 한글을 단어 단위로 줄바꿈 */
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -77,18 +70,7 @@ h1,
 h2,
 h3 {
   font-weight: 600;
-  letter-spacing: -0.02em;
-}
-
-/* 카드 요약·인용·제목처럼 "읽는 글"에 쓰는 명조 */
-.font-serif {
   letter-spacing: -0.01em;
-  line-height: 1.75;
-}
-
-/* 숫자·ID·시각은 고정폭이라 자릿수가 맞는다 */
-.font-mono {
-  letter-spacing: 0;
 }
 
 /* 떠 있는 면(메뉴 등): 반투명 유리 대신 한 단계 밝은 면 */

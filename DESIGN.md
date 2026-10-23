@@ -424,7 +424,7 @@ PLAN 25에서 Glass Iris로 정했다가, 이후 요청으로 "따뜻한 차콜"
 
 - **분위기**: 순수 검정·흰색 없이 따뜻한 회갈색 바탕(`#1f1e1d`), 면 `#262624`·`#30302e`·`#3a3936`, 테두리 `#3e3d39`·`#52504b`, 글자 `#f0eee6`·`#b7b4ab`·`#85827a`. 포인트색은 테라코타 `#d97757`(hover `#e08a6d`) 하나이며 한 화면에 3곳 이내(주요 버튼, 로고, 선택·새 카드 점)에만 쓴다. 상태색은 성공 `#7fa37a`, 경고·제안 `#d4a85a`, 오류 `#d46a6a`.
 - **색 규칙**: 모든 색은 `app/globals.css`의 변수 한곳에서만 정하고 화면에서는 `bg-canvas`, `text-muted`, `bg-brand`처럼 이름으로 쓴다. 포인트색 위 글자는 대비를 위해 어두운 색(`#1f1e1d`)이다.
-- **글꼴(모두 npm 패키지로 같은 서버에서 내보냄)**: 화면 글자 Pretendard Variable(동적 서브셋), 카드 요약·인용은 명조 계열 Noto Serif KR(MaruBuri는 npm에 없어 대체), 숫자·날짜는 JetBrains Mono. 기본 15px, 줄 높이 1.65, 자간 -0.01em, `word-break: keep-all`.
+- **글꼴**: Inter Tight 하나(400·500·600), 한글은 기기 글꼴. (Pretendard·명조·고정폭 글꼴은 가독성이 기대와 달라 되돌렸다.)
 - **모양**: 카드 12px, 버튼 10px, 아이콘은 lucide-react(선 1.5). 움직임 150~220ms ease-out, 움직임 줄이기 설정을 따른다. 새 카드는 부드럽게 나타나고(`.card-new`) 점이 빛난다(`.dot-new`, 쓰는 화면에서 클래스만 붙이면 된다).
 - **로고**: 점과 선으로 그린 Trail 마크(`components/trail-mark.tsx`), 한 가지 색.
 - **공통 부품**: `components/ui.tsx`(buttonClass, Badge, Skeleton, EmptyState). 인용은 `.quote-block`(왼쪽 테라코타 선).

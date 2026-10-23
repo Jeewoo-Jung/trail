@@ -116,7 +116,7 @@ function NodeRow(props: {
             {props.label}
             {props.badge && <UiBadge tone="warn">{props.badge}</UiBadge>}
           </span>
-          <span className="font-mono text-xs text-subtle">{props.count}</span>
+          <span className="text-xs text-subtle">{props.count}</span>
         </button>
       </div>
       {props.proposal && (
@@ -148,21 +148,21 @@ export function CardItem({ card, deleteCard }: { card: TreeCard; deleteCard?: (f
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex flex-col gap-1 text-left">
         <span className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{card.title}</span>
-          <span className="font-mono text-xs text-subtle">{dateFormat.format(new Date(card.createdAt))}</span>
+          <span className="text-xs text-subtle">{dateFormat.format(new Date(card.createdAt))}</span>
           {card.status === "pending" && <Badge text="분류 중" tone="blue" />}
           {card.status === "waiting" && <Badge text="미분류(대기)" tone="amber" />}
           {card.hasEstimate && <Badge text="추정" tone="amber" />}
           {card.noEvidence && <Badge text="근거 없음" tone="gray" />}
           {card.subUndecided && <Badge text="하위 미정" tone="gray" />}
         </span>
-        {card.summary !== "" && <span className="font-serif text-[15px] text-muted">{card.summary}</span>}
+        {card.summary !== "" && <span className="text-sm text-muted">{card.summary}</span>}
       </button>
       {open && (
         <div className="flex flex-col gap-2 border-t border-line pt-2 text-sm">
           {card.evidence.length > 0 && (
             <ul className="flex flex-col gap-1 text-muted">
               {card.evidence.map((e, i) => (
-                <li key={i} className="quote-block font-serif">“{e}”</li>
+                <li key={i} className="quote-block">“{e}”</li>
               ))}
             </ul>
           )}
