@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# 값이 없는 견본 파일만 git에 올린다
+!.env.example
 
 # vercel
 .vercel
