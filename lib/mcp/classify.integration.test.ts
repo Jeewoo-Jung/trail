@@ -40,7 +40,8 @@ describe.skipIf(!enabled)("분류 (실제 Supabase + 가짜/실제 Claude)", () 
     if (!client) return;
     if (conversations.length) await client.from("conversations").delete().in("key", conversations);
     if (createdSubs.length) await client.from("sub_concepts").delete().in("id", createdSubs);
-    await client.auth.signOut();
+    // 시험이 만든 로그인만 끝낸다. 전체 로그아웃(global)이면 내가 브라우저에서 쓰는 로그인까지 끊긴다.
+    await client.auth.signOut({ scope: "local" });
   });
 
   it("가짜 Claude가 신규 하위 개념을 제안하면 제안 상태로 저장되고 카드는 done이 된다", async () => {
