@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
@@ -57,6 +58,7 @@ async function SignedIn() {
           <a href="/api/export?format=md" download className="rounded-full border border-black/15 px-4 py-1.5 text-sm font-medium dark:border-white/20">Markdown</a>
           <a href="/api/export?format=json" download className="rounded-full border border-black/15 px-4 py-1.5 text-sm font-medium dark:border-white/20">JSON</a>
         </span>
+        <Link href="/my/settings" className="rounded-full border border-black/15 px-4 py-1.5 text-sm font-medium dark:border-white/20">설정</Link>
         <form action={logout}>
           <button type="submit" className="rounded-full border border-black/15 px-4 py-1.5 text-sm font-medium dark:border-white/20">
             로그아웃
