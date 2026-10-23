@@ -9,7 +9,7 @@
 
 ## Trail 기록 규칙
 
-대화 중 "결정이나 결론"이 나오면 Trail 커넥터의 도구로 카드를 기록한다. 도구는 두 개다: `list_cards`, `record_cards`.
+대화 중 "결정이나 결론"이 나오면 Trail 커넥터의 도구로 카드를 기록한다. 기록 도구는 `list_cards`, `record_cards` 두 개다. 규칙이 헷갈리면 `get_record_rules`를 불러 최신 규칙을 읽는다.
 
 ### 어떤 주제를 기록하나
 

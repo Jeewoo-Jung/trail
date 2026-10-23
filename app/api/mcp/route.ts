@@ -1,4 +1,4 @@
-// Design Ref: DESIGN.md §4.1, §6.1 — Claude 커스텀 커넥터가 호출하는 원격 MCP 접수 창구. 도구는 list_cards, record_cards 두 개다.
+// Design Ref: DESIGN.md §4.1, §6.1 — Claude 커스텀 커넥터가 호출하는 원격 MCP 접수 창구. 도구는 list_cards, record_cards, get_record_rules 세 개다.
 // 흐름: 크기 제한 → 토큰 확인(서명 + 내 계정) → 호출 횟수 → 도구 실행. 로그에는 종류·코드만 남기고 카드 내용은 남기지 않는다.
 import { createClient } from "@supabase/supabase-js";
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
@@ -8,6 +8,7 @@ import { createClaudeClassifier } from "@/lib/claude/classifier";
 import { limitRequestBody } from "@/lib/mcp/body-limit";
 import { classifyPendingThenWaiting, type Classifier } from "@/lib/mcp/classify-card";
 import { listCards } from "@/lib/mcp/list-cards";
+import { loadRecordRules } from "@/lib/mcp/record-rules";
 import { verifyOwnerToken } from "@/lib/mcp/owner-auth";
 import { guardRequest } from "@/lib/mcp/rate-guard";
 import { recordCards } from "@/lib/mcp/record-cards";
@@ -65,6 +66,27 @@ const handler = createMcpHandler(
           if (!guard.ok) return text(guard.message, true);
           const outcome = await listCards(createSupabaseCardStore(client), input);
           return outcome.ok ? text(outcome.output) : text(outcome.errors.join(" / "), true);
+        } catch (error) {
+          return text(describeFailure(error), true);
+        }
+      },
+    );
+
+    server.registerTool(
+      "get_record_rules",
+      {
+        title: "최신 기록 규칙 조회",
+        description: "Trail의 최신 기록 규칙(언제 기록하고 묻는지, 카드 한도, 실패 시 행동)을 돌려준다. 규칙이 헷갈리거나 사용자 지침과 다르게 느껴질 때 부른다.",
+        inputSchema: z.object({}),
+      },
+      async (_input, ctx) => {
+        const token = ctx.http?.authInfo?.token;
+        if (!token) return text("인증 정보가 없습니다.", true);
+        try {
+          const guard = await guardRequest(createSupabaseRateStore(clientFor(token)), 0);
+          if (!guard.ok) return text(guard.message, true);
+          const rules = await loadRecordRules();
+          return rules ? text(rules) : text("규칙 문서를 읽지 못했습니다.", true);
         } catch (error) {
           return text(describeFailure(error), true);
         }
