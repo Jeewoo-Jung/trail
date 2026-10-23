@@ -32,3 +32,15 @@ export async function approveSub(formData: FormData) {
 export async function rejectSub(formData: FormData) {
   await decideSub(formData, false);
 }
+
+// 잘못 기록된 카드 삭제. 카드 내용을 고치는 기능은 없고 삭제만 된다.
+export async function deleteCard(formData: FormData) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  const id = formData.get("card_id");
+  if (typeof id !== "string" || !z.uuid().safeParse(id).success) return;
+  const supabase = await createClient();
+  const { error } = await supabase.from("cards").delete().eq("id", id);
+  if (error) console.error("[my] 카드 삭제 실패", error.code);
+  revalidatePath("/my");
+}

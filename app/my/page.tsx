@@ -11,7 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { cardsOfNode, pendingProposals } from "@/lib/rules/tree";
 import { unclassifiedRatio } from "@/lib/rules/unclassified";
-import { approveSub, logout, rejectSub } from "./actions";
+import { approveSub, deleteCard, logout, rejectSub } from "./actions";
 
 export default function MyPage() {
   return (
@@ -53,6 +53,10 @@ async function SignedIn() {
           <p className="text-zinc-600 dark:text-zinc-400">{user.email ?? "로그인함"}</p>
           <RealtimeStatus />
         </div>
+        <span className="flex items-center gap-2">
+          <a href="/api/export?format=md" download className="rounded-full border border-black/15 px-4 py-1.5 text-sm font-medium dark:border-white/20">Markdown</a>
+          <a href="/api/export?format=json" download className="rounded-full border border-black/15 px-4 py-1.5 text-sm font-medium dark:border-white/20">JSON</a>
+        </span>
         <form action={logout}>
           <button type="submit" className="rounded-full border border-black/15 px-4 py-1.5 text-sm font-medium dark:border-white/20">
             로그아웃
@@ -88,7 +92,7 @@ async function SignedIn() {
           </ul>
         </section>
       )}
-      <ConceptTree tree={tree} />
+      <ConceptTree tree={tree} deleteCard={deleteCard} />
     </section>
   );
 }

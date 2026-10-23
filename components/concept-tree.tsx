@@ -6,7 +6,7 @@ import { cardsOfNode, type TopNode, type TreeCard } from "@/lib/rules/tree";
 
 const dateFormat = new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "numeric", day: "numeric" });
 
-export function ConceptTree({ tree, renderCardActions }: { tree: TopNode[]; renderCardActions?: (card: TreeCard) => React.ReactNode }) {
+export function ConceptTree({ tree, deleteCard }: { tree: TopNode[]; deleteCard?: (formData: FormData) => Promise<void> }) {
   const [selected, setSelected] = useState<string | null>(null);
   const cards = cardsOfNode(tree, selected);
   const total = cardsOfNode(tree, null).length;
@@ -37,7 +37,7 @@ export function ConceptTree({ tree, renderCardActions }: { tree: TopNode[]; rend
         {cards.length === 0 ? (
           <p className="text-sm text-zinc-500">{total === 0 ? "아직 기록된 카드가 없습니다. Claude에서 기록하면 여기에 나타납니다." : "이 개념에는 카드가 없습니다."}</p>
         ) : (
-          cards.map((card) => <CardItem key={card.id} card={card} actions={renderCardActions?.(card)} />)
+          cards.map((card) => <CardItem key={card.id} card={card} deleteCard={deleteCard} />)
         )}
       </section>
     </div>
@@ -66,8 +66,9 @@ function Badge({ text, tone }: { text: string; tone: "gray" | "amber" | "blue" }
   return <span className={`rounded-full border px-2 py-0.5 text-xs ${color}`}>{text}</span>;
 }
 
-function CardItem({ card, actions }: { card: TreeCard; actions?: React.ReactNode }) {
+function CardItem({ card, deleteCard }: { card: TreeCard; deleteCard?: (formData: FormData) => Promise<void> }) {
   const [open, setOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const classification = card.topName ? `${card.topName} > ${card.subName ?? "하위 미정"}` : "미분류";
   return (
     <article className="flex flex-col gap-2 rounded-lg border border-black/15 p-4 dark:border-white/20">
@@ -97,7 +98,20 @@ function CardItem({ card, actions }: { card: TreeCard; actions?: React.ReactNode
           {card.candidates.length > 0 && (
             <p className="text-xs text-zinc-500">후보: {card.candidates.map((c) => `${c.top}${c.sub ? ` > ${c.sub}` : ""}${c.isNewSub ? " (신규)" : ""}`).join(" / ")}</p>
           )}
-          {actions}
+          {deleteCard && (
+            <div className="flex items-center gap-2">
+              {confirming ? (
+                <form action={deleteCard} className="flex items-center gap-2">
+                  <input type="hidden" name="card_id" value={card.id} />
+                  <span className="text-xs text-red-600">이 카드를 삭제합니다. 되돌릴 수 없습니다.</span>
+                  <button type="submit" className="rounded-full bg-red-600 px-3 py-1 text-xs font-medium text-white">삭제</button>
+                  <button type="button" onClick={() => setConfirming(false)} className="rounded-full border border-black/15 px-3 py-1 text-xs dark:border-white/20">취소</button>
+                </form>
+              ) : (
+                <button type="button" onClick={() => setConfirming(true)} className="rounded-full border border-black/15 px-3 py-1 text-xs dark:border-white/20">삭제</button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </article>
