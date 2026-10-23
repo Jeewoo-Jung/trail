@@ -8,7 +8,8 @@ import { reclassifyWaiting } from "@/lib/mcp/classify-card";
 import { createSupabaseClassifyStore } from "@/lib/mcp/supabase-classify-store";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { logout } from "./actions";
+import { pendingProposals } from "@/lib/rules/tree";
+import { approveSub, logout, rejectSub } from "./actions";
 
 export default function MyPage() {
   return (
@@ -28,6 +29,7 @@ async function SignedIn() {
 
   const supabase = await createClient();
   const { tree } = await loadTree(supabase);
+  const proposals = pendingProposals(tree);
 
   // 화면을 연 김에, 한도 때문에 미뤄 둔 "미분류(대기)" 카드를 다시 분류한다(DESIGN.md §4.5). 화면은 기다리지 않는다.
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -51,6 +53,30 @@ async function SignedIn() {
           </button>
         </form>
       </div>
+      {proposals.length > 0 && (
+        <section aria-label="승인 대기" className="flex flex-col gap-2 rounded-lg border border-amber-500/60 p-4 text-sm">
+          <h2 className="font-semibold">승인 대기 {proposals.length}</h2>
+          <ul className="flex flex-col gap-2">
+            {proposals.map((p) => (
+              <li key={p.subId} className="flex flex-wrap items-center justify-between gap-2">
+                <span>
+                  “{p.name}” <span className="text-zinc-500">({p.topName} &gt; 신규, 카드 {p.cardCount}장)</span>
+                </span>
+                <span className="flex gap-2">
+                  <form action={approveSub}>
+                    <input type="hidden" name="sub_id" value={p.subId} />
+                    <button type="submit" className="rounded-full bg-black px-4 py-1 text-xs font-medium text-white dark:bg-white dark:text-black">승인</button>
+                  </form>
+                  <form action={rejectSub}>
+                    <input type="hidden" name="sub_id" value={p.subId} />
+                    <button type="submit" className="rounded-full border border-black/15 px-4 py-1 text-xs font-medium dark:border-white/20">거절</button>
+                  </form>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <ConceptTree tree={tree} />
     </section>
   );
