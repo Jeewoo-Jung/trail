@@ -6,6 +6,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { listCards } from "./list-cards";
 import { recordCards, type RecordOutput } from "./record-cards";
+import { createSupabaseRateStore } from "./supabase-rate-store";
 import { createSupabaseCardStore } from "./supabase-store";
 import type { CardStore } from "./store";
 
@@ -29,6 +30,7 @@ describe.skipIf(!enabled)("Supabase 저장소 (실제 로그인으로 시험)", 
   let store: CardStore;
   let userId = "";
   const conversations: string[] = [];
+  const RATE_WINDOW = new Date(Date.UTC(2000, 0, 1)); // 실제 사용 구간과 겹치지 않는 먼 과거
   let settingsBefore: { always_excluded: string[]; blocked: string[] } | null = null;
 
   async function record(input: Record<string, unknown>): Promise<RecordOutput> {
@@ -50,6 +52,7 @@ describe.skipIf(!enabled)("Supabase 저장소 (실제 로그인으로 시험)", 
 
   afterAll(async () => {
     if (!client) return;
+    await client.from("api_calls").delete().eq("window_start", RATE_WINDOW.toISOString());
     if (conversations.length > 0) await client.from("conversations").delete().in("key", conversations);
     if (settingsBefore === null) await client.from("settings").delete().eq("user_id", userId);
     else await client.from("settings").update(settingsBefore).eq("user_id", userId);
@@ -150,6 +153,13 @@ describe.skipIf(!enabled)("Supabase 저장소 (실제 로그인으로 시험)", 
   it("없는 대화 키는 거절한다", async () => {
     const outcome = await recordCards(store, { conversationKey: "11111111-1111-4111-8111-111111111111", cards: [] });
     expect(outcome.ok).toBe(false);
+  });
+
+  it("호출 횟수는 같은 구간에서 1씩 올라간다", async () => {
+    const rate = createSupabaseRateStore(client);
+    expect(await rate.increment("minute", RATE_WINDOW)).toBe(1);
+    expect(await rate.increment("minute", RATE_WINDOW)).toBe(2);
+    expect(await rate.increment("day", RATE_WINDOW)).toBe(1);
   });
 
   it("로그인하지 않은 연결로는 카드를 읽을 수 없다", async () => {

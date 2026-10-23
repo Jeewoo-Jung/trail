@@ -13,3 +13,10 @@ export const CARDS_PER_CONVERSATION_MAX = 10;
 
 /** Claude가 근거로 확인되지 않은 문장 끝에 붙이는 표기 */
 export const ESTIMATE_MARKER = "(추정)";
+
+/** 커넥터(기록·조회) 호출에만 적용하는 요청 크기·횟수 한도. */
+export const REQUEST_LIMITS = {
+  maxBytes: 20 * 1024,
+  perMinute: 30,
+  perDay: 500,
+} as const;
