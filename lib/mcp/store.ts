@@ -30,6 +30,8 @@ export type ConceptLists = {
 
 export interface CardStore {
   getExclusions(): Promise<Exclusions>;
+  /** 내가 정한 프로젝트 주제 목록(앱 설정에 저장돼 있다). */
+  getProjectTopics(): Promise<string[]>;
   /** "이 주제는 항상 제외"로 고른 주제를 더한다. 이미 있는 것과 겹치면 하나로 합친다. */
   addAlwaysExcluded(topics: string[]): Promise<void>;
   getConversation(key: string): Promise<ConversationInfo | null>;

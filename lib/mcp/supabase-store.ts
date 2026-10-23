@@ -56,6 +56,12 @@ export function createSupabaseCardStore(client: SupabaseClient): CardStore {
       return { alwaysExcluded: data?.always_excluded ?? [], blocked: data?.blocked ?? [] };
     },
 
+    async getProjectTopics(): Promise<string[]> {
+      const { data, error } = await client.from("settings").select("project_topics").maybeSingle();
+      check(error, "프로젝트 주제 읽기");
+      return data?.project_topics ?? [];
+    },
+
     async addAlwaysExcluded(topics: string[]): Promise<void> {
       const current = await store.getExclusions();
       const merged = cleanTopicList([...current.alwaysExcluded, ...topics]);

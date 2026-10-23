@@ -25,7 +25,16 @@ describe("listCards", () => {
       topConcepts: ["연구", "업무"],
       approvedSubConcepts: [{ top: "연구", name: "임베딩" }],
       excludedTopics: ["비밀 주제", "개인 일기"],
+      projectTopics: [],
     });
+  });
+
+  it("앱에 저장된 프로젝트 주제를 돌려준다(공백·중복 정리)", async () => {
+    const store = storeWithConcepts();
+    store.projectTopics = ["Trail 앱", "trail앱", " 취업 "];
+    const outcome = await listCards(store, {});
+    if (!outcome.ok) throw new Error("성공해야 함");
+    expect(outcome.output.projectTopics).toEqual(["Trail 앱", "취업"]);
   });
 
   it("입력이 아예 없어도(undefined) 처음 기록하는 것으로 본다", async () => {

@@ -18,8 +18,9 @@ describe("instructions/trail-record-rules.md", () => {
     expect(body).toContain(`${REQUEST_LIMITS.maxBytes / 1024}KB`);
     expect(body).toContain(ESTIMATE_MARKER);
   });
-  it("실제 주제 목록 대신 자리표시자만 있다", () => {
-    expect(body).toContain("{내 주제 목록}");
+  it("주제 목록은 지침에 적지 않고 list_cards의 projectTopics를 따르게 한다", () => {
+    expect(body).toContain("projectTopics");
+    expect(body).not.toContain("{내 주제 목록}");
   });
   it("실제 도구 이름과 입력 칸 이름을 쓰고 있다", () => {
     for (const name of ["list_cards", "record_cards", "questionCount", "excludeTopics", "topicKey", "cardId", "conversationKey".replace("conversationKey", "대화 키")]) expect(body).toContain(name);
