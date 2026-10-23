@@ -1,5 +1,5 @@
 // Design Ref: PRD 5 must 2 — 화면과 같은 카드 데이터(근거 발췌 포함)를 Markdown과 JSON으로 내려받는다.
-import type { TopNode, TreeCard } from "./tree";
+import type { ConceptNode, TreeCard } from "./tree";
 import { cardsOfNode } from "./tree";
 
 export type ExportedCard = {
@@ -9,6 +9,9 @@ export type ExportedCard = {
   keywords: string[];
   evidence: string[];
   candidates: TreeCard["candidates"];
+  /** 뿌리부터 이 카드가 붙은 개념까지의 이름들. 비어 있으면 미분류 */
+  path: string[];
+  /** path의 첫째·둘째(옛 내려받기와 맞추려고 남겨 둔다) */
   top: string | null;
   sub: string | null;
   classificationStatus: TreeCard["status"];
@@ -17,7 +20,7 @@ export type ExportedCard = {
   createdAt: string;
 };
 
-export function exportCards(tree: readonly TopNode[]): ExportedCard[] {
+export function exportCards(tree: readonly ConceptNode[]): ExportedCard[] {
   return cardsOfNode(tree, null).map((c) => ({
     id: c.id,
     title: c.title,
@@ -25,8 +28,9 @@ export function exportCards(tree: readonly TopNode[]): ExportedCard[] {
     keywords: c.keywords,
     evidence: c.evidence,
     candidates: c.candidates,
-    top: c.topName,
-    sub: c.subName,
+    path: c.path,
+    top: c.path[0] ?? null,
+    sub: c.path[1] ?? null,
     classificationStatus: c.status,
     hasEstimate: c.hasEstimate,
     noEvidence: c.noEvidence,
@@ -34,21 +38,21 @@ export function exportCards(tree: readonly TopNode[]): ExportedCard[] {
   }));
 }
 
-export function toJson(tree: readonly TopNode[], exportedAt: Date): string {
+export function toJson(tree: readonly ConceptNode[], exportedAt: Date): string {
   return JSON.stringify({ exportedAt: exportedAt.toISOString(), cards: exportCards(tree) }, null, 2);
 }
 
 /** 한 줄로 이어 쓰는 자리(제목·주제)에서 줄바꿈이 Markdown 구조를 깨지 않게 한다. */
 const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
 
-export function toMarkdown(tree: readonly TopNode[], exportedAt: Date): string {
+export function toMarkdown(tree: readonly ConceptNode[], exportedAt: Date): string {
   const lines: string[] = ["# Trail 내보내기", "", `내보낸 시각: ${exportedAt.toISOString()}`, ""];
   const cards = exportCards(tree);
   if (cards.length === 0) lines.push("기록된 카드가 없습니다.", "");
 
   const groups = new Map<string, ExportedCard[]>();
   for (const card of cards) {
-    const key = card.top ? `${card.top} > ${card.sub ?? "하위 미정"}` : "미분류";
+    const key = card.path.length > 0 ? card.path.join(" > ") : "미분류";
     groups.set(key, [...(groups.get(key) ?? []), card]);
   }
   for (const [group, items] of [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0], "ko"))) {

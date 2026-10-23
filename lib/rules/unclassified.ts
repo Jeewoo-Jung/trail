@@ -3,11 +3,11 @@
 export const UNCLASSIFIED_RATIO_LIMIT = 0.2;
 export const UNCLASSIFIED_MIN_CARDS = 10;
 
-export type RatioInput = { status: "pending" | "done" | "waiting"; topName: string | null };
+export type RatioInput = { status: "pending" | "done" | "waiting"; path: readonly string[] };
 
 export function unclassifiedRatio(cards: readonly RatioInput[]): { done: number; unclassified: number; ratio: number; warn: boolean } {
   const done = cards.filter((c) => c.status === "done");
-  const unclassified = done.filter((c) => c.topName === null).length;
+  const unclassified = done.filter((c) => c.path.length === 0).length;
   const ratio = done.length === 0 ? 0 : unclassified / done.length;
   return { done: done.length, unclassified, ratio, warn: done.length >= UNCLASSIFIED_MIN_CARDS && ratio > UNCLASSIFIED_RATIO_LIMIT };
 }

@@ -2,7 +2,7 @@
 
 // Design Ref: DESIGN.md §3.2~3.3 — 왼쪽 개념 트리, 오른쪽 선택한 개념의 카드. 좁은 화면에서는 위아래로 쌓는다.
 import { useState } from "react";
-import { cardsOfNode, type TopNode, type TreeCard } from "@/lib/rules/tree";
+import { classificationLabel, cardsOfNode, findNode, type ConceptNode, type TreeCard } from "@/lib/rules/tree";
 
 const dateFormat = new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "numeric", day: "numeric" });
 
@@ -11,18 +11,19 @@ type FormAction = (formData: FormData) => Promise<void>;
 export function ConceptTree({
   tree,
   deleteCard,
-  approveSub,
-  rejectSub,
+  approveConcept,
+  rejectConcept,
 }: {
-  tree: TopNode[];
+  tree: ConceptNode[];
   deleteCard?: FormAction;
-  approveSub?: FormAction;
-  rejectSub?: FormAction;
+  approveConcept?: FormAction;
+  rejectConcept?: FormAction;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   const cards = cardsOfNode(tree, selected);
   const total = cardsOfNode(tree, null).length;
+  const selectedNode = selected ? findNode(tree, selected) : null;
 
   const toggle = (key: string) =>
     setCollapsed((prev) => {
@@ -32,44 +33,38 @@ export function ConceptTree({
       return next;
     });
 
+  const branch = (node: ConceptNode, parentProposed: boolean): React.ReactNode => {
+    const foldable = node.children.length > 0;
+    const open = !collapsed.has(node.key);
+    return (
+      <div key={node.key} className="flex flex-col gap-1">
+        <NodeRow
+          active={selected === node.key}
+          onSelect={() => setSelected(node.key)}
+          label={node.name}
+          count={node.count}
+          strong={node.depth === 1}
+          depth={node.depth - 1}
+          badge={node.proposed ? "제안" : undefined}
+          expanded={foldable ? open : undefined}
+          onToggle={foldable ? () => toggle(node.key) : undefined}
+          // 제안 중인 가지는 맨 위 노드에서만 승인·거절한다(가지째 처리하므로).
+          proposal={node.proposed && !parentProposed && node.id && approveConcept && rejectConcept ? { id: node.id, approve: approveConcept, reject: rejectConcept } : undefined}
+        />
+        {foldable && open && node.children.map((child) => branch(child, parentProposed || node.proposed))}
+      </div>
+    );
+  };
+
   return (
     <div className="grid gap-6 md:grid-cols-[18rem_1fr]">
       <nav aria-label="개념 트리" className="flex flex-col gap-1 text-sm">
         <NodeRow active={selected === null} onSelect={() => setSelected(null)} label="전체" count={total} />
-        {tree.map((top) => {
-          const foldable = top.id !== null; // "미분류"는 하위가 하나뿐이라 접을 것이 없다
-          const open = !collapsed.has(top.key);
-          return (
-            <div key={top.key} className="flex flex-col gap-1">
-              <NodeRow
-                active={selected === top.key}
-                onSelect={() => setSelected(top.key)}
-                label={top.name}
-                count={top.count}
-                strong
-                expanded={foldable ? open : undefined}
-                onToggle={foldable ? () => toggle(top.key) : undefined}
-              />
-              {foldable &&
-                open &&
-                top.subs.map((sub) => (
-                  <NodeRow
-                    key={sub.key}
-                    active={selected === sub.key}
-                    onSelect={() => setSelected(sub.key)}
-                    label={sub.name}
-                    count={sub.cards.length}
-                    indent
-                    badge={sub.proposed ? "제안" : undefined}
-                    proposal={sub.proposed && sub.id && approveSub && rejectSub ? { subId: sub.id, approve: approveSub, reject: rejectSub } : undefined}
-                  />
-                ))}
-            </div>
-          );
-        })}
+        {tree.map((root) => branch(root, false))}
       </nav>
 
       <section aria-label="카드 목록" className="flex flex-col gap-3">
+        {selectedNode && selectedNode.path.length > 1 && <p className="text-xs text-subtle">{selectedNode.path.join(" › ")}</p>}
         {cards.length === 0 ? (
           <p className="text-sm text-subtle">{total === 0 ? "아직 기록된 카드가 없습니다. Claude에서 기록하면 여기에 나타납니다." : "이 개념에는 카드가 없습니다."}</p>
         ) : (
@@ -86,15 +81,16 @@ function NodeRow(props: {
   label: string;
   count: number;
   strong?: boolean;
-  indent?: boolean;
+  /** 들여쓰기 단계(0이 뿌리) */
+  depth?: number;
   badge?: string;
   /** 접고 펼 수 있는 노드면 현재 펼쳐져 있는지. 없으면 접을 수 없는 노드다. */
   expanded?: boolean;
   onToggle?: () => void;
-  proposal?: { subId: string; approve: FormAction; reject: FormAction };
+  proposal?: { id: string; approve: FormAction; reject: FormAction };
 }) {
   return (
-    <div className={`flex flex-col gap-1 rounded-xl ${props.indent ? "ml-4" : ""} ${props.active ? "bg-surface-active" : "hover:bg-surface-hover"}`}>
+    <div style={{ marginLeft: `${(props.depth ?? 0) * 14}px` }} className={`flex flex-col gap-1 rounded-xl ${props.active ? "bg-surface-active" : "hover:bg-surface-hover"}`}>
       <div className="flex items-center">
         {props.onToggle ? (
           <button
@@ -125,11 +121,11 @@ function NodeRow(props: {
       {props.proposal && (
         <div className="flex gap-2 pb-1.5 pl-6">
           <form action={props.proposal.approve}>
-            <input type="hidden" name="sub_id" value={props.proposal.subId} />
+            <input type="hidden" name="concept_id" value={props.proposal.id} />
             <button type="submit" className="rounded-xl bg-brand hover:brightness-110 px-3 py-0.5 text-xs font-medium text-on-accent">승인</button>
           </form>
           <form action={props.proposal.reject}>
-            <input type="hidden" name="sub_id" value={props.proposal.subId} />
+            <input type="hidden" name="concept_id" value={props.proposal.id} />
             <button type="submit" className="rounded-xl border border-line hover:bg-surface-hover px-3 py-0.5 text-xs font-medium">거절</button>
           </form>
         </div>
@@ -146,7 +142,7 @@ function Badge({ text, tone }: { text: string; tone: "gray" | "amber" | "blue" }
 export function CardItem({ card, deleteCard }: { card: TreeCard; deleteCard?: (formData: FormData) => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const classification = card.topName ? `${card.topName} > ${card.subName ?? "하위 미정"}` : "미분류";
+  const classification = classificationLabel(card.path);
   return (
     <article className="flex flex-col gap-2 rounded-xl border border-line p-4">
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex flex-col gap-1 text-left">
@@ -173,7 +169,7 @@ export function CardItem({ card, deleteCard }: { card: TreeCard; deleteCard?: (f
           {card.keywords.length > 0 && <p className="text-muted">{card.keywords.map((k) => `#${k}`).join(" ")}</p>}
           <p className="text-muted">분류: {classification}</p>
           {card.candidates.length > 0 && (
-            <p className="text-xs text-subtle">후보: {card.candidates.map((c) => `${c.top}${c.sub ? ` > ${c.sub}` : ""}${c.isNewSub ? " (신규)" : ""}`).join(" / ")}</p>
+            <p className="text-xs text-subtle">후보: {card.candidates.map((c) => `${c.path.join(" > ")}${c.isNew ? " (신규)" : ""}`).join(" / ")}</p>
           )}
           {deleteCard && (
             <div className="flex items-center gap-2">

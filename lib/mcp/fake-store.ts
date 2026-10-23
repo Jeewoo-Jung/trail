@@ -25,7 +25,7 @@ export class FakeStore implements CardStore {
   cards = new Map<string, StoredCard>();
   conversations = new Map<string, { key: string; questionCount: number }>();
   exclusions: Exclusions = { alwaysExcluded: [], blocked: [] };
-  concepts: ConceptLists = { topConcepts: [], approvedSubConcepts: [] };
+  concepts: ConceptLists = { concepts: [] };
   updateCalls = 0;
   insertCalls = 0;
 
@@ -102,6 +102,6 @@ export class FakeStore implements CardStore {
   }
 
   async listConcepts(): Promise<ConceptLists> {
-    return { topConcepts: [...this.concepts.topConcepts], approvedSubConcepts: [...this.concepts.approvedSubConcepts] };
+    return { concepts: this.concepts.concepts.map((c) => ({ ...c, path: [...c.path] })) };
   }
 }

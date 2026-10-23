@@ -1,19 +1,26 @@
 // Design Ref: DESIGN.md §12 — 옵시디언 그래프 보기처럼 점들이 서로 밀어내고 선이 당기는 힘으로 자리를 잡는 배치.
 // 화면(components/mindmap.tsx)이 이 계산을 매 프레임 돌리고, 계산 자체는 화면과 무관하게 시험할 수 있도록 여기에 둔다.
-import { FOLD_SUBS_PER_TOP, FOLD_TOTAL_NODES } from "./mindmap";
-import type { TopNode } from "./tree";
+import type { ConceptNode } from "./tree";
+
+/** 접는 기준. 한 개념의 자식이 이보다 많거나, 전체 점이 이보다 많으면 일부를 처음부터 접어 둔다. */
+export const FOLD_CHILDREN = 8;
+export const FOLD_TOTAL_NODES = 40;
+export const FOLD_ALL_NODES = 120;
 
 export type GraphNode = {
   id: string;
   /** 트리 화면과 같은 키 */
   key: string;
   label: string;
+  /** 뿌리(상위 개념)는 top, 그 아래는 모두 sub */
   kind: "top" | "sub";
-  /** 상위 개념의 순번. 같은 상위 개념에 속한 점은 같은 색으로 보인다 */
+  /** 뿌리가 1 */
+  depth: number;
+  /** 뿌리의 순번. 같은 뿌리 아래의 점은 같은 색으로 보인다 */
   group: number;
   count: number;
   proposed: boolean;
-  /** 접혀서 숨겨진 하위 개념 수 */
+  /** 접혀서 숨겨진 하위 개념 수(그 아래 전부) */
   hidden: number;
   r: number;
   x: number;
@@ -25,12 +32,13 @@ export type GraphNode = {
 export type GraphEdge = { source: string; target: string };
 export type Graph = { nodes: GraphNode[]; edges: GraphEdge[] };
 
-export const NODE_MIN_R = { top: 9, sub: 5 } as const;
+const MIN_R = [0, 9, 6, 5, 4, 4] as const;
 
-/** 카드가 많을수록 점이 조금 커진다(옵시디언은 연결이 많을수록 커진다). */
-export function nodeRadius(kind: "top" | "sub", count: number): number {
-  const base = NODE_MIN_R[kind];
-  return Math.round((base + Math.min(Math.sqrt(count) * (kind === "top" ? 2.2 : 2.6), kind === "top" ? 14 : 10)) * 10) / 10;
+/** 카드가 많을수록 점이 조금 커진다(옵시디언은 연결이 많을수록 커진다). 깊은 개념일수록 작다. */
+export function nodeRadius(depth: number, count: number): number {
+  const base = MIN_R[Math.min(depth, 5)];
+  const extra = Math.min(Math.sqrt(count) * (depth === 1 ? 2.2 : 2.6), depth === 1 ? 14 : 10);
+  return Math.round((base + extra) * 10) / 10;
 }
 
 const LINK_DISTANCE = 95;
@@ -45,42 +53,50 @@ function wobble(index: number): number {
   return x - Math.floor(x) - 0.5;
 }
 
-/** 처음에 접어 둘 상위 개념(마인드맵 규칙과 같다). */
-export function defaultCollapsedGraph(tree: readonly TopNode[]): Set<string> {
-  const total = tree.reduce((sum, t) => sum + 1 + (t.id === null ? 0 : t.subs.length), 0);
-  const foldAll = total > FOLD_TOTAL_NODES;
-  return new Set(tree.filter((t) => t.id !== null && (foldAll || t.subs.length > FOLD_SUBS_PER_TOP)).map((t) => t.key));
+const countAll = (n: ConceptNode): number => n.children.reduce((s, k) => s + 1 + countAll(k), 0);
+const allNodes = (tree: readonly ConceptNode[]): ConceptNode[] => tree.flatMap((n) => [n, ...allNodes(n.children)]);
+
+/** 처음에 접어 둘 개념. 점이 많아질수록 더 많이 접는다. */
+export function defaultCollapsedGraph(tree: readonly ConceptNode[]): Set<string> {
+  const nodes = allNodes(tree);
+  const total = nodes.length;
+  return new Set(
+    nodes
+      .filter((n) => n.children.length > 0)
+      .filter((n) => total > FOLD_ALL_NODES || n.children.length > FOLD_CHILDREN || (total > FOLD_TOTAL_NODES && n.depth >= 2))
+      .map((n) => n.key),
+  );
 }
 
 /** 트리에서 점과 선을 만든다. previous가 있으면 같은 점은 있던 자리에서 이어 간다. */
-export function buildGraph(tree: readonly TopNode[], collapsed: ReadonlySet<string>, previous?: ReadonlyMap<string, { x: number; y: number }>): Graph {
+export function buildGraph(tree: readonly ConceptNode[], collapsed: ReadonlySet<string>, previous?: ReadonlyMap<string, { x: number; y: number }>): Graph {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
   const ring = Math.max(1, tree.length);
+  let counter = 0;
 
-  tree.forEach((top, g) => {
-    const angle = -Math.PI / 2 + (g * 2 * Math.PI) / ring;
-    const hub = { x: Math.cos(angle) * 170, y: Math.sin(angle) * 170 };
-    const foldable = top.id !== null;
-    const subs = foldable ? top.subs : [];
-    const isCollapsed = foldable && collapsed.has(top.key);
-    const prevTop = previous?.get(top.key);
+  const place = (node: ConceptNode, group: number, x: number, y: number, outward: number, parentKey: string | null) => {
+    const isCollapsed = node.children.length > 0 && collapsed.has(node.key);
+    const prev = previous?.get(node.key);
     nodes.push({
-      id: top.key, key: top.key, label: top.name, kind: "top", group: g, count: top.count, proposed: false,
-      hidden: isCollapsed ? subs.length : 0, r: nodeRadius("top", top.count),
-      x: prevTop?.x ?? hub.x, y: prevTop?.y ?? hub.y, vx: 0, vy: 0, pinned: false,
+      id: node.key, key: node.key, label: node.name, kind: node.depth === 1 ? "top" : "sub", depth: node.depth, group, count: node.count,
+      proposed: node.proposed, hidden: isCollapsed ? countAll(node) : 0, r: nodeRadius(node.depth, node.count),
+      x: prev?.x ?? x, y: prev?.y ?? y, vx: 0, vy: 0, pinned: false,
     });
+    if (parentKey) edges.push({ source: parentKey, target: node.key });
     if (isCollapsed) return;
-    subs.forEach((sub, j) => {
-      const prev = previous?.get(sub.key);
-      const a = angle + ((j - (subs.length - 1) / 2) * 0.55) + wobble(g * 31 + j) * 0.2;
-      const start = prev ?? { x: hub.x + Math.cos(a) * LINK_DISTANCE, y: hub.y + Math.sin(a) * LINK_DISTANCE };
-      nodes.push({
-        id: sub.key, key: sub.key, label: sub.name, kind: "sub", group: g, count: sub.cards.length, proposed: sub.proposed, hidden: 0,
-        r: nodeRadius("sub", sub.cards.length), x: start.x, y: start.y, vx: 0, vy: 0, pinned: false,
-      });
-      edges.push({ source: top.key, target: sub.key });
+    const n = node.children.length;
+    const spread = 0.62 / Math.sqrt(node.depth);
+    const dist = LINK_DISTANCE * Math.pow(0.92, node.depth - 1);
+    node.children.forEach((child, j) => {
+      const a = outward + (j - (n - 1) / 2) * spread + wobble(++counter) * 0.2;
+      place(child, group, x + Math.cos(a) * dist, y + Math.sin(a) * dist, a, node.key);
     });
+  };
+
+  tree.forEach((root, g) => {
+    const angle = -Math.PI / 2 + (g * 2 * Math.PI) / ring;
+    place(root, g, Math.cos(angle) * 170, Math.sin(angle) * 170, angle, null);
   });
   return { nodes, edges };
 }

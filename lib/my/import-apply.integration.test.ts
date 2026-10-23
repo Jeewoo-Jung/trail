@@ -1,5 +1,5 @@
 // 진짜 Supabase(내 계정 로그인)에서 추천 승인 저장이 실제로 동작하는지 시험한다. (PLAN 21번)
-// 상위 개념은 앱이 지울 수 없어서(삽입만 허용) 이 시험에서는 실제로 만들지 않고, 권한 규칙만 확인한다.
+// 상위 개념은 이 시험에서 실제로 만들지 않고(내 데이터에 남지 않게), 권한 규칙만 확인한다.
 // 프로젝트 주제는 저장한 뒤 시험 전 상태로 되돌린다. 실행: npm run test:integration
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -49,18 +49,10 @@ describe.skipIf(!enabled)("추천 승인 저장 (실제 로그인으로 시험)"
     expect(now?.blocked ?? []).toEqual(before?.blocked ?? []);
   });
 
-  it("상위 개념은 내 행으로만 추가할 수 있고, 고치거나 지울 수는 없다", async () => {
-    const other = await client.from("top_concepts").insert({ user_id: "00000000-0000-4000-8000-000000000000", name: "__시험 남의 행" });
+  it("개념은 내 행으로만 추가할 수 있고, 로그인하지 않은 연결로는 읽을 수도 없다", async () => {
+    const other = await client.from("concepts").insert({ user_id: "00000000-0000-4000-8000-000000000000", name: "__시험 남의 행" });
     expect(other.error).not.toBeNull(); // 남의 번호로는 추가할 수 없다
-    const upd = await client.from("top_concepts").update({ name: "__시험 바꿈" }).eq("name", "취업준비");
-    expect(upd.error).not.toBeNull(); // 수정 권한 없음
-    const del = await client.from("top_concepts").delete().eq("name", "__시험 없음");
-    expect(del.error).not.toBeNull(); // 삭제 권한 없음
-    expect((await client.from("top_concepts").select("name").eq("name", "취업준비")).data).toHaveLength(1);
-  });
-
-  it("로그인하지 않은 연결로는 상위 개념을 추가할 수 없다", async () => {
-    const res = await createClient(url!, key!).from("top_concepts").insert({ name: "__시험 익명" });
-    expect(res.error).not.toBeNull();
+    const anon = await createClient(url!, key!).from("concepts").insert({ name: "__시험 익명" });
+    expect(anon.error).not.toBeNull();
   });
 });

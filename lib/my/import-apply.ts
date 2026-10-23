@@ -11,17 +11,20 @@ function check(error: { code?: string } | null, what: string): void {
   if (error) throw new StoreError(what, error.code);
 }
 
-export async function loadExisting(client: SupabaseClient): Promise<{ tops: string[]; sortMax: number; topics: string[] }> {
-  const [tops, settings] = await Promise.all([
-    client.from("top_concepts").select("name, sort_order"),
+export async function loadExisting(client: SupabaseClient): Promise<{ tops: string[]; sortMax: number; topics: string[]; totalConcepts: number }> {
+  const [concepts, settings] = await Promise.all([
+    client.from("concepts").select("name, sort_order, parent_id"),
     client.from("settings").select("project_topics").maybeSingle(),
   ]);
-  check(tops.error, "상위 개념 읽기");
+  check(concepts.error, "개념 읽기");
   check(settings.error, "프로젝트 주제 읽기");
+  const roots = (concepts.data ?? []).filter((r) => r.parent_id === null);
   return {
-    tops: (tops.data ?? []).map((r) => r.name as string),
-    sortMax: Math.max(-1, ...(tops.data ?? []).map((r) => r.sort_order as number)),
+    // 뿌리(상위 개념) 이름들. 이미 있는 이름(제안·거절 포함)은 다시 추천하거나 저장하지 않는다.
+    tops: roots.map((r) => r.name as string),
+    sortMax: Math.max(-1, ...roots.map((r) => r.sort_order as number)),
     topics: settings.data?.project_topics ?? [],
+    totalConcepts: (concepts.data ?? []).length,
   };
 }
 
@@ -42,14 +45,14 @@ export type SaveResult = { ok: true; savedTopConcepts: number; savedProjectTopic
 
 export async function saveApproved(client: SupabaseClient, topConcepts: readonly string[], projectTopics: readonly string[]): Promise<SaveResult> {
   const existing = await loadExisting(client);
-  const checked = checkApproved(topConcepts, projectTopics, existing.tops, existing.topics);
+  const checked = checkApproved(topConcepts, projectTopics, existing.tops, existing.topics, existing.totalConcepts);
   if (!checked.ok) return checked;
   if (checked.topConcepts.length === 0 && checked.projectTopics.length === 0) return { ok: false, message: "저장할 새 항목이 없습니다." };
 
-  if (checked.topConcepts.length > 0) {
-    const rows = checked.topConcepts.map((name, i) => ({ name, sort_order: existing.sortMax + 1 + i }));
-    const { error } = await client.from("top_concepts").upsert(rows, { onConflict: "user_id,name", ignoreDuplicates: true });
-    check(error, "상위 개념 저장");
+  // 상위 개념(뿌리)은 승인한 상태로 한 줄씩 넣는다. 그 사이 같은 이름이 생겼다면(23505) 건너뛴다.
+  for (const [i, name] of checked.topConcepts.entries()) {
+    const { error } = await client.from("concepts").insert({ parent_id: null, name, status: "approved", sort_order: existing.sortMax + 1 + i });
+    if (error && error.code !== "23505") throw new StoreError("상위 개념 저장", error.code);
   }
   if (checked.projectTopics.length > 0) {
     const { error } = await client

@@ -1,8 +1,12 @@
 // Design Ref: DESIGN.md §3.2 — 카드와 개념 목록으로 화면에 그릴 개념 트리를 만드는 순수 규칙.
+// 개념은 부모-자식으로 이어지는 트리다(5단계까지). 카드는 트리의 어느 한 개념에 붙고, 개념마다 "그 아래 모든 카드 수"를 센다.
 import { findEstimates } from "./card";
 import type { ClassificationCandidate } from "./card";
+import type { ConceptRef } from "./classification";
 
 export type ClassificationStatus = "pending" | "done" | "waiting";
+
+export type ConceptRow = ConceptRef & { sortOrder: number };
 
 export type CardRow = {
   id: string;
@@ -11,108 +15,151 @@ export type CardRow = {
   keywords: string[];
   evidence: string[];
   candidates: ClassificationCandidate[];
-  topId: string | null;
-  subId: string | null;
+  conceptId: string | null;
   status: ClassificationStatus;
   createdAt: string;
 };
-export type TopRow = { id: string; name: string; sortOrder: number };
-export type SubRow = { id: string; topId: string; name: string; status: "proposed" | "approved" | "rejected" };
 
 export type TreeCard = CardRow & {
   /** 요약에 "(추정)"으로 끝나는 문장이 있다 */
   hasEstimate: boolean;
   /** 근거 발췌가 하나도 없다 */
   noEvidence: boolean;
-  /** 거절된 하위 개념 때문에 하위 개념이 비어 있다("하위 미정") */
+  /** 뿌리부터 이 카드가 붙은 개념까지의 이름들. 비어 있으면 미분류 */
+  path: string[];
+  /** 카드가 붙은 개념 아래에 더 세부 개념이 있는데도 이 카드는 거기 직접 붙어 있다("하위 미정") */
   subUndecided: boolean;
-  topName: string | null;
-  subName: string | null;
 };
 
-export type SubNode = { key: string; id: string | null; name: string; proposed: boolean; undecided: boolean; cards: TreeCard[] };
-export type TopNode = { key: string; id: string | null; name: string; count: number; subs: SubNode[] };
+export type ConceptNode = {
+  /** 화면에서 노드를 가리키는 키. 개념은 `c:<id>`, 미분류는 UNCLASSIFIED_KEY */
+  key: string;
+  id: string | null;
+  name: string;
+  /** 뿌리부터 이 노드까지의 이름들 */
+  path: string[];
+  /** 뿌리가 1 */
+  depth: number;
+  proposed: boolean;
+  /** 이 노드와 그 아래 모든 노드에 붙은 카드 수 */
+  count: number;
+  /** 이 노드에 직접 붙은 카드 */
+  ownCards: TreeCard[];
+  children: ConceptNode[];
+};
 
 export const UNCLASSIFIED_KEY = "unclassified";
 export const UNCLASSIFIED_NAME = "미분류";
-export const UNDECIDED_SUB_NAME = "하위 미정";
+export const nodeKey = (id: string): string => `c:${id}`;
 
 const byNewest = (a: TreeCard, b: TreeCard) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0);
 
 /**
  * 트리를 만든다.
- * - 상위 개념은 정렬 번호·이름 순, 그 아래 하위 개념은 승인된 것 → 제안 중인 것 순.
- * - 카드가 없는 상위 개념도 보여 준다(내가 정해 둔 목록이므로). 카드가 없는 하위 개념은 승인된 것만 보여 준다.
- * - 거절된 하위 개념의 카드와 하위 개념이 비어 있는 카드는 "하위 미정" 아래에 둔다.
- * - 상위 개념이 없는 카드(분류 중·대기 포함)는 "미분류"에 둔다.
+ * - 형제는 승인된 것 → 제안 중인 것 순, 그 안에서 정렬 번호·이름 순.
+ * - 승인된 개념은 카드가 없어도 보이고(내가 정해 둔 것이므로), 제안 중인 개념은 그 아래에 카드가 하나라도 있을 때만 보인다.
+ * - 거절된 개념은 보이지 않는다. 거절된(또는 없어진) 개념에 붙은 카드는 가장 가까운 남은 조상에, 없으면 "미분류"에 둔다.
+ * - 개념이 없는 카드(분류 중·대기 포함)는 "미분류" 노드에 모은다.
  */
-export function buildTree(cards: readonly CardRow[], tops: readonly TopRow[], subs: readonly SubRow[]): TopNode[] {
-  const topById = new Map(tops.map((t) => [t.id, t]));
-  const subById = new Map(subs.map((s) => [s.id, s]));
+export function buildTree(cards: readonly CardRow[], concepts: readonly ConceptRow[]): ConceptNode[] {
+  const byId = new Map(concepts.map((c) => [c.id, c]));
+  const childrenOf = new Map<string | null, ConceptRow[]>();
+  for (const c of concepts) childrenOf.set(c.parentId, [...(childrenOf.get(c.parentId) ?? []), c]);
 
-  const decorated: TreeCard[] = cards.map((card) => {
-    const top = card.topId ? (topById.get(card.topId) ?? null) : null;
-    const sub = card.subId ? (subById.get(card.subId) ?? null) : null;
-    const usableSub = top && sub && sub.topId === top.id && sub.status !== "rejected" ? sub : null;
-    return {
-      ...card,
-      hasEstimate: findEstimates(card.summary).length > 0,
-      noEvidence: card.evidence.length === 0,
-      subUndecided: Boolean(top && card.status === "done" && !usableSub),
-      topName: top?.name ?? null,
-      subName: usableSub?.name ?? null,
-    };
+  /** 카드가 실제로 붙을 개념: 거절된 개념이면 부모로 올라간다. */
+  const effective = (id: string | null): string | null => {
+    let cur = id;
+    const seen = new Set<string>();
+    while (cur !== null) {
+      const c = byId.get(cur);
+      if (!c || seen.has(cur)) return null;
+      seen.add(cur);
+      if (c.status !== "rejected") return cur;
+      cur = c.parentId;
+    }
+    return null;
+  };
+
+  const cardsByConcept = new Map<string | null, CardRow[]>();
+  for (const card of cards) {
+    const target = effective(card.conceptId);
+    cardsByConcept.set(target, [...(cardsByConcept.get(target) ?? []), card]);
+  }
+
+  const decorate = (card: CardRow, path: string[]): TreeCard => ({
+    ...card,
+    hasEstimate: findEstimates(card.summary).length > 0,
+    noEvidence: card.evidence.length === 0,
+    path,
+    subUndecided: false,
   });
 
-  const sortedTops = [...tops].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "ko"));
-  const result: TopNode[] = sortedTops.map((top) => {
-    const topCards = decorated.filter((c) => c.topId === top.id).sort(byNewest);
-    const topSubs = subs
-      .filter((s) => s.topId === top.id && s.status !== "rejected")
-      .sort((a, b) => (a.status === b.status ? a.name.localeCompare(b.name, "ko") : a.status === "approved" ? -1 : 1));
-
-    const subNodes: SubNode[] = [];
-    for (const sub of topSubs) {
-      const subCards = topCards.filter((c) => c.subName === sub.name && c.subId === sub.id);
-      if (sub.status === "proposed" && subCards.length === 0) continue;
-      subNodes.push({ key: `sub:${sub.id}`, id: sub.id, name: sub.name, proposed: sub.status === "proposed", undecided: false, cards: subCards });
+  const build = (parentId: string | null, parentPath: string[], depth: number): ConceptNode[] => {
+    const nodes: ConceptNode[] = [];
+    const siblings = (childrenOf.get(parentId) ?? [])
+      .filter((c) => c.status !== "rejected")
+      .sort((a, b) => (a.status === b.status ? a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "ko") : a.status === "approved" ? -1 : 1));
+    for (const c of siblings) {
+      const path = [...parentPath, c.name];
+      const children = build(c.id, path, depth + 1);
+      const ownCards = (cardsByConcept.get(c.id) ?? []).map((card) => decorate(card, path)).sort(byNewest);
+      const count = ownCards.length + children.reduce((s, k) => s + k.count, 0);
+      if (c.status === "proposed" && count === 0) continue;
+      if (children.length > 0) for (const card of ownCards) card.subUndecided = true;
+      nodes.push({ key: nodeKey(c.id), id: c.id, name: c.name, path, depth, proposed: c.status === "proposed", count, ownCards, children });
     }
-    const undecided = topCards.filter((c) => c.subName === null);
-    if (undecided.length > 0) {
-      subNodes.push({ key: `undecided:${top.id}`, id: null, name: UNDECIDED_SUB_NAME, proposed: false, undecided: true, cards: undecided });
-    }
-    return { key: `top:${top.id}`, id: top.id, name: top.name, count: topCards.length, subs: subNodes };
-  });
+    return nodes;
+  };
 
-  const unclassified = decorated.filter((c) => c.topName === null).sort(byNewest);
+  const roots = build(null, [], 1);
+  const unclassified = (cardsByConcept.get(null) ?? []).map((card) => decorate(card, [])).sort(byNewest);
   if (unclassified.length > 0) {
-    result.push({
-      key: UNCLASSIFIED_KEY,
-      id: null,
-      name: UNCLASSIFIED_NAME,
-      count: unclassified.length,
-      subs: [{ key: "unclassified:all", id: null, name: UNCLASSIFIED_NAME, proposed: false, undecided: false, cards: unclassified }],
-    });
+    roots.push({ key: UNCLASSIFIED_KEY, id: null, name: UNCLASSIFIED_NAME, path: [], depth: 1, proposed: false, count: unclassified.length, ownCards: unclassified, children: [] });
   }
-  return result;
+  return roots;
 }
 
-/** 어느 노드를 눌렀을 때 오른쪽에 보여 줄 카드. 상위 개념을 누르면 그 아래 모든 카드. */
-export function cardsOfNode(tops: readonly TopNode[], key: string | null): TreeCard[] {
-  if (key === null) return tops.flatMap((t) => t.subs.flatMap((s) => s.cards)).sort(byNewest);
-  for (const top of tops) {
-    if (top.key === key) return top.subs.flatMap((s) => s.cards).sort(byNewest);
-    const sub = top.subs.find((s) => s.key === key);
-    if (sub) return sub.cards;
+export function findNode(tree: readonly ConceptNode[], key: string): ConceptNode | null {
+  for (const n of tree) {
+    if (n.key === key) return n;
+    const inner = findNode(n.children, key);
+    if (inner) return inner;
   }
-  return [];
+  return null;
 }
 
-export type Proposal = { subId: string; topName: string; name: string; cardCount: number };
+const subtreeCards = (node: ConceptNode): TreeCard[] => [...node.ownCards, ...node.children.flatMap(subtreeCards)];
 
-/** 승인을 기다리는 하위 개념(제안)을 모은다. 위에서부터 트리 순서를 따른다. */
-export function pendingProposals(tree: readonly TopNode[]): Proposal[] {
-  return tree.flatMap((top) =>
-    top.subs.flatMap((sub) => (sub.proposed && sub.id ? [{ subId: sub.id, topName: top.name, name: sub.name, cardCount: sub.cards.length }] : [])),
-  );
+/** 노드를 눌렀을 때 오른쪽에 보여 줄 카드: 그 노드와 그 아래 모든 카드(최근 것이 먼저). key가 null이면 전체. */
+export function cardsOfNode(tree: readonly ConceptNode[], key: string | null): TreeCard[] {
+  if (key === null) return tree.flatMap(subtreeCards).sort(byNewest);
+  const node = findNode(tree, key);
+  return node ? subtreeCards(node).sort(byNewest) : [];
 }
+
+/** 트리의 모든 노드를 위에서 아래로(부모가 먼저) 펼친 목록 */
+export function flattenNodes(tree: readonly ConceptNode[]): ConceptNode[] {
+  return tree.flatMap((n) => [n, ...flattenNodes(n.children)]);
+}
+
+export type Proposal = { conceptId: string; name: string; parentPath: string[]; cardCount: number; descendantCount: number };
+
+/**
+ * 승인을 기다리는 개념. 제안 중인 가지는 맨 위 노드 하나만 올린다(승인·거절은 가지째 하므로).
+ * 부모가 아직 제안 중이면 그 부모를 먼저 승인해야 하므로 따로 올리지 않는다.
+ */
+export function pendingProposals(tree: readonly ConceptNode[]): Proposal[] {
+  const out: Proposal[] = [];
+  const countAll = (n: ConceptNode): number => n.children.reduce((s, k) => s + 1 + countAll(k), 0);
+  const walk = (n: ConceptNode, parentProposed: boolean) => {
+    if (n.proposed && !parentProposed && n.id) {
+      out.push({ conceptId: n.id, name: n.name, parentPath: n.path.slice(0, -1), cardCount: n.count, descendantCount: countAll(n) });
+    }
+    for (const k of n.children) walk(k, parentProposed || n.proposed);
+  };
+  for (const n of tree) walk(n, false);
+  return out;
+}
+
+/** 카드의 분류를 한 줄로("취업준비 > 자기소개서"). 없으면 미분류. */
+export const classificationLabel = (path: readonly string[]): string => (path.length > 0 ? path.join(" > ") : UNCLASSIFIED_NAME);

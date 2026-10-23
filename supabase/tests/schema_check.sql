@@ -13,11 +13,11 @@ declare
   n integer;
   c integer;
 begin
-  -- 시험용 사용자와 상위 개념 (권한이 높은 상태에서 만든다)
+  -- 시험용 사용자와 개념 (권한이 높은 상태에서 만든다)
   insert into auth.users (id, aud, role, email)
   values (a, 'authenticated', 'authenticated', 'a@test.invalid'),
          (b, 'authenticated', 'authenticated', 'b@test.invalid');
-  insert into public.top_concepts (user_id, name) values (a, '연구'), (b, '연구');
+  insert into public.concepts (user_id, name, status) values (a, '연구', 'approved'), (b, '연구', 'approved');
 
   -- ───────── A로 로그인한 것처럼 ─────────
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
@@ -118,10 +118,9 @@ begin
   r := r || 'A14 카드 지운 뒤 카드 수=' || c || (case when c = 9 then ' ✔' else ' ✘' end) || '|';
 
   begin
-    insert into public.top_concepts (name) values ('내가 만든 상위 개념');
-    r := r || 'A15 상위 개념을 앱에서 만들 수 있음 ✘|';
-  exception when insufficient_privilege then r := r || 'A15 상위 개념 쓰기 막힘 ✔|';
-            when others then r := r || 'A15 다른 오류 ✘ ' || sqlstate || '|'; end;
+    insert into public.concepts (name) values ('내가 만든 개념');
+    r := r || 'A15 내 개념 만들기 ✔|';
+  exception when others then r := r || 'A15 내 개념 만들기 실패 ✘ ' || sqlerrm || '|'; end;
 
   begin
     insert into public.cards (user_id, conversation_key, topic_key, title) values (b, conv, 'x', '남의 이름으로');
@@ -129,8 +128,8 @@ begin
   exception when insufficient_privilege then r := r || 'A16 남의 이름으로 저장 막힘 ✔|';
             when others then r := r || 'A16 다른 오류 ✘ ' || sqlstate || '|'; end;
 
-  select count(*) into n from public.top_concepts;
-  r := r || 'A17 내가 보는 상위 개념 수=' || n || (case when n = 1 then ' ✔' else ' ✘' end) || '|';
+  select count(*) into n from public.concepts;
+  r := r || 'A17 내가 보는 개념 수=' || n || (case when n = 2 then ' ✔' else ' ✘' end) || '|';
 
   begin
     insert into public.settings (always_excluded) values ('{주제1}');
@@ -149,8 +148,8 @@ begin
   r := r || 'B2 B가 보는 대화 수=' || n || (case when n = 0 then ' ✔' else ' ✘' end) || '|';
   select count(*) into n from public.settings;
   r := r || 'B3 B가 보는 설정 수=' || n || (case when n = 0 then ' ✔' else ' ✘' end) || '|';
-  select count(*) into n from public.top_concepts;
-  r := r || 'B4 B가 보는 상위 개념 수=' || n || (case when n = 1 then ' ✔(자기 것만)' else ' ✘' end) || '|';
+  select count(*) into n from public.concepts;
+  r := r || 'B4 B가 보는 개념 수=' || n || (case when n = 1 then ' ✔(자기 것만)' else ' ✘' end) || '|';
 
   update public.cards set title = '가로챔';
   get diagnostics n = row_count;
@@ -172,17 +171,17 @@ begin
 
   reset role;
 
-  -- 상위 개념을 지우면 카드의 상위 개념만 비워지고 카드는 남는다
+  -- 개념을 지우면 카드의 개념만 비워지고 카드는 남는다
   insert into public.conversations (user_id) values (b) returning key into conv_b;
-  insert into public.cards (user_id, conversation_key, topic_key, title, top_concept_id)
-  select b, conv_b, 'tt', '제목', id from public.top_concepts where user_id = b;
-  delete from public.top_concepts where user_id = b;
-  select count(*) into n from public.cards where conversation_key = conv_b and top_concept_id is null;
-  r := r || 'D1 상위 개념을 지워도 카드는 남음=' || n || (case when n = 1 then ' ✔' else ' ✘' end) || '|';
+  insert into public.cards (user_id, conversation_key, topic_key, title, concept_id)
+  select b, conv_b, 'tt', '제목', id from public.concepts where user_id = b;
+  delete from public.concepts where user_id = b;
+  select count(*) into n from public.cards where conversation_key = conv_b and concept_id is null;
+  r := r || 'D1 개념을 지워도 카드는 남음=' || n || (case when n = 1 then ' ✔' else ' ✘' end) || '|';
 
-  -- 실시간 목록에 카드·하위 개념이 올라갔는지 (이 프로젝트에 해당 목록이 있을 때만 의미가 있다)
+  -- 실시간 목록에 카드·개념이 올라갔는지 (이 프로젝트에 해당 목록이 있을 때만 의미가 있다)
   select count(*) into n from pg_publication_tables
-   where pubname = 'supabase_realtime' and schemaname = 'public' and tablename in ('cards', 'sub_concepts');
+   where pubname = 'supabase_realtime' and schemaname = 'public' and tablename in ('cards', 'concepts');
   r := r || 'E1 실시간 목록의 표 수=' || n || (case when n = 2 then ' ✔' else ' ✘' end) || '|';
 
   raise exception 'TRAIL_TEST_RESULT %', r;

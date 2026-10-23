@@ -117,7 +117,7 @@ describe("카드 전체 가리기", () => {
       summary: `요약에도 ${fake("ghp_", 36)} 가 있다.`,
       keywords: [`k-${fake("vcp_", 40)}`, "정상"],
       evidence: [`근거 ${key}`, "정상 근거"],
-      candidates: [{ top: "연구", sub: `이름 ${fake("sbp_", 40)}` }],
+      candidates: [{ path: ["연구", `이름 ${fake("sbp_", 20)}`], isNew: false }],
       projectTopic: `주제 ${key}`,
     });
     const { card: masked, maskedCount } = maskCard(card);
