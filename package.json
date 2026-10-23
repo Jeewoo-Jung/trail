@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "test:integration": "node --env-file=.env --env-file=.env.local node_modules/vitest/vitest.mjs run lib/mcp/supabase-store.integration.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.1.0",

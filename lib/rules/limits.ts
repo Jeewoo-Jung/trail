@@ -8,5 +8,8 @@ export const CARD_LIMITS = {
   candidatesMaxCount: 3,
 } as const;
 
+/** 한 대화에서 만들 수 있는 카드 수. 데이터베이스에도 같은 한도가 걸려 있다. (supabase/migrations) */
+export const CARDS_PER_CONVERSATION_MAX = 10;
+
 /** Claude가 근거로 확인되지 않은 문장 끝에 붙이는 표기 */
 export const ESTIMATE_MARKER = "(추정)";
