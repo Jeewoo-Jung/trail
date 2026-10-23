@@ -3,9 +3,13 @@
 import Link from "next/link";
 import { TrailMark } from "@/components/trail-mark";
 import { NodeTreeView } from "@/components/node-tree-view";
+import { StarDocumentView } from "@/components/star-document";
+import { buildStarDocument } from "@/lib/rules/star-doc";
 import { SAMPLE_NODE_DATA } from "@/lib/sample/sample-nodes";
 
 export default function Home() {
+  // 샘플 프로젝트를 최종 산출(STAR 문서)로 만들면 이런 모양이 된다(코드 안의 가상 데이터만 쓴다).
+  const sampleDoc = buildStarDocument(SAMPLE_NODE_DATA, "s-p1");
   return (
     <>
       <div role="note" className="bg-surface-active px-4 py-2 text-center text-xs text-muted">
@@ -33,6 +37,15 @@ export default function Home() {
         <section className="rounded-[1.75rem] bg-surface p-5 md:p-8">
           <NodeTreeView data={SAMPLE_NODE_DATA} />
         </section>
+        {sampleDoc && (
+          <section aria-label="STAR 문서 미리보기" className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-3xl font-semibold">최종 산출은 STAR 문서</h2>
+              <p className="max-w-2xl text-muted">프로젝트나 활동을 제출용 문서로 모아 봅니다. 제외한 노드는 자동으로 빠지고, 비어 있는 항목은 쓰지 않습니다. 로그인하면 Markdown·JSON으로 내려받을 수 있어요. (아래는 지어낸 예시입니다.)</p>
+            </div>
+            <StarDocumentView doc={sampleDoc} />
+          </section>
+        )}
       </main>
     </>
   );

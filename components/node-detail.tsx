@@ -3,6 +3,7 @@
 // 선택한 노드의 상세와 편집: 이름·종류·상태·기간·설명·위치, STAR 항목, 산출물, 하위 추가·합치기·쪼개기·휴지통.
 // 모든 필드를 바로(인라인) 고치고, 고친 필드는 잠금 표시가 붙는다. actions가 없으면(샘플 화면) 읽기 전용이다.
 import { Lock } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { FieldEditor } from "@/components/field-editor";
 import { openStoredFile, removeStoredFile, uploadOutputFile } from "@/components/stored-files";
@@ -32,6 +33,13 @@ export function NodeDetail({ tree, data, node, actions, onSelect, userId, nowIso
       <header className="flex flex-col gap-1">
         <p className="text-xs text-subtle">{node.path.join(" › ")}</p>
         {actions && <ExcludeToggle node={node} actions={actions} />}
+        {actions && !node.effectiveExcluded && (node.kind === "project" || hasStar(node.kind)) && (
+          <p className="flex flex-wrap items-center gap-3 text-sm">
+            <Link href={`/my/documents?id=${node.id}`} className="text-accent hover:underline">STAR 문서로 보기</Link>
+            <a href={`/api/export?scope=${node.id}&format=md`} download className="text-accent hover:underline">Markdown</a>
+            <a href={`/api/export?scope=${node.id}&format=json`} download className="text-accent hover:underline">JSON</a>
+          </p>
+        )}
         <div className="flex flex-wrap items-center gap-2">
           <Badge>{NODE_KIND_LABEL[node.kind]}</Badge>
           <Badge tone={node.portfolioStatus === "excluded" ? "warn" : "neutral"}>{PORTFOLIO_LABEL[node.portfolioStatus]}</Badge>

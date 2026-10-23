@@ -5,12 +5,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Settings, TreeDeciduous, type LucideIcon } from "lucide-react";
+import { FileText, Network, Settings, TreeDeciduous, type LucideIcon } from "lucide-react";
 import { RealtimeStatus } from "@/components/realtime-status";
 import { TrailMark } from "@/components/trail-mark";
 
 const NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/my", label: "내 기록", icon: TreeDeciduous },
+  { href: "/my/documents", label: "STAR 문서", icon: FileText },
+  { href: "/my/mindmap", label: "마인드맵", icon: Network },
   { href: "/my/settings", label: "설정", icon: Settings },
 ];
 
