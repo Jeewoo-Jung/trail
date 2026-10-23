@@ -107,3 +107,12 @@ export function cardsOfNode(tops: readonly TopNode[], key: string | null): TreeC
   }
   return [];
 }
+
+export type Proposal = { subId: string; topName: string; name: string; cardCount: number };
+
+/** 승인을 기다리는 하위 개념(제안)을 모은다. 위에서부터 트리 순서를 따른다. */
+export function pendingProposals(tree: readonly TopNode[]): Proposal[] {
+  return tree.flatMap((top) =>
+    top.subs.flatMap((sub) => (sub.proposed && sub.id ? [{ subId: sub.id, topName: top.name, name: sub.name, cardCount: sub.cards.length }] : [])),
+  );
+}

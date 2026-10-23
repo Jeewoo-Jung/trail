@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTree, cardsOfNode, type CardRow, type SubRow, type TopRow } from "./tree";
+import { buildTree, cardsOfNode, pendingProposals, type CardRow, type SubRow, type TopRow } from "./tree";
 
 const tops: TopRow[] = [
   { id: "t2", name: "연구", sortOrder: 1 },
@@ -72,5 +72,15 @@ describe("cardsOfNode", () => {
     expect(cardsOfNode(tree, "top:t1").map((c) => c.id).sort()).toEqual(["1", "2"]);
     expect(cardsOfNode(tree, "sub:s1").map((c) => c.id)).toEqual(["1"]);
     expect(cardsOfNode(tree, "없는키")).toEqual([]);
+  });
+});
+
+describe("pendingProposals", () => {
+  it("제안 중인 하위 개념만 상위 개념 이름·카드 수와 함께 모은다", () => {
+    const tree = buildTree([card("1", { topId: "t1", subId: "s2" }), card("2", { topId: "t1", subId: "s2" }), card("3", { topId: "t1", subId: "s1" })], tops, subs);
+    expect(pendingProposals(tree)).toEqual([{ subId: "s2", topName: "취업준비", name: "자기소개서", cardCount: 2 }]);
+  });
+  it("제안이 없으면 빈 배열", () => {
+    expect(pendingProposals(buildTree([], tops, subs))).toEqual([]);
   });
 });

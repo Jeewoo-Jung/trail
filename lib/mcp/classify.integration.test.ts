@@ -3,6 +3,7 @@
 // 시험 데이터(대화·카드·시험용 제안 하위 개념)는 끝에 지운다. 실행: npm run test:integration
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { approveSubConcept, rejectSubConcept } from "../my/proposals";
 import { createClaudeClassifier } from "../claude/classifier";
 import { classifyCard, reclassifyWaiting } from "./classify-card";
 import { createSupabaseClassifyStore } from "./supabase-classify-store";
@@ -77,6 +78,29 @@ describe.skipIf(!enabled)("분류 (실제 Supabase + 가짜/실제 Claude)", () 
     const r = await reclassifyWaiting(store, async () => ({ top: "미분류" }));
     expect(r.stillWaiting).toBe(0);
     expect((await client.from("cards").select("classification_status").eq("id", id).single()).data?.classification_status).toBe("done");
+  });
+
+  it("제안을 거절하면 카드는 하위 미정이 되고, 같은 이름은 다시 제안되지 않는다. 승인은 확정한다", async () => {
+    const store = createSupabaseClassifyStore(client);
+    const id = await newCard("t5", "요약");
+    await classifyCard(store, async () => ({ top: "취업준비", sub: "__시험거절__" }), id);
+    const subId = (await client.from("cards").select("sub_concept_id").eq("id", id).single()).data!.sub_concept_id as string;
+    createdSubs.push(subId);
+    expect(await rejectSubConcept(client, subId)).toBe(true);
+    expect((await client.from("cards").select("sub_concept_id").eq("id", id).single()).data?.sub_concept_id).toBeNull();
+    expect(await rejectSubConcept(client, subId)).toBe(false); // 이미 처리됨
+    expect(await approveSubConcept(client, subId)).toBe(false); // 거절된 것은 승인할 수 없다
+
+    const again = await newCard("t6", "요약");
+    await classifyCard(store, async () => ({ top: "취업준비", sub: "__시험거절__" }), again);
+    const row = await client.from("cards").select("sub_concept_id, classification_status").eq("id", again).single();
+    expect(row.data).toEqual({ sub_concept_id: null, classification_status: "done" });
+
+    await classifyCard(store, async () => ({ top: "취업준비", sub: "__시험승인__" }), again);
+    const okSub = (await client.from("cards").select("sub_concept_id").eq("id", again).single()).data!.sub_concept_id as string;
+    createdSubs.push(okSub);
+    expect(await approveSubConcept(client, okSub)).toBe(true);
+    expect((await client.from("sub_concepts").select("status").eq("id", okSub).single()).data?.status).toBe("approved");
   });
 
   it.skipIf(!anthropicKey)("진짜 Claude(claude-haiku-5-5)가 취업 관련 카드를 취업준비로 분류한다", async () => {
