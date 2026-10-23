@@ -12,8 +12,8 @@ type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 export default function ConsentPage({ searchParams }: { searchParams: SearchParams }) {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center gap-6 px-6 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">연결 승인</h1>
-      <Suspense fallback={<p className="text-sm text-zinc-500">불러오는 중…</p>}>
+      <h1 className="text-3xl">연결 승인</h1>
+      <Suspense fallback={<p className="text-sm text-subtle">불러오는 중…</p>}>
         <Consent searchParams={searchParams} />
       </Suspense>
     </main>
@@ -40,24 +40,24 @@ async function Consent({ searchParams }: { searchParams: SearchParams }) {
 
   return (
     <section className="flex flex-col gap-5">
-      {params.error === "owner" && <p role="alert" className="text-sm text-red-600">이 계정은 승인할 수 없습니다.</p>}
-      {params.error === "1" && <p role="alert" className="text-sm text-red-600">처리하지 못했습니다. 다시 시도해 주세요.</p>}
+      {params.error === "owner" && <p role="alert" className="text-sm text-danger">이 계정은 승인할 수 없습니다.</p>}
+      {params.error === "1" && <p role="alert" className="text-sm text-danger">처리하지 못했습니다. 다시 시도해 주세요.</p>}
       <p>
         <strong>{data.client.name || "이름 없는 앱"}</strong>
         이(가) 내 Trail 기록에 접근하려고 합니다.
       </p>
-      <dl className="flex flex-col gap-3 rounded-lg border border-black/15 p-4 text-sm dark:border-white/20">
+      <dl className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-5 text-sm">
         <div>
           <dt className="font-medium">돌아갈 주소</dt>
-          <dd className="break-all text-zinc-600 dark:text-zinc-400">{host ?? "알 수 없음"}</dd>
+          <dd className="break-all text-muted">{host ?? "알 수 없음"}</dd>
         </div>
         <div>
           <dt className="font-medium">요청한 권한</dt>
           <dd>
-            <ul className="list-inside list-disc text-zinc-600 dark:text-zinc-400">
+            <ul className="list-inside list-disc text-muted">
               {scopes.map((s) => (
                 <li key={s.name}>
-                  {s.label} <span className="text-xs text-zinc-500">({s.name})</span>
+                  {s.label} <span className="text-xs text-subtle">({s.name})</span>
                 </li>
               ))}
             </ul>
@@ -65,21 +65,21 @@ async function Consent({ searchParams }: { searchParams: SearchParams }) {
         </div>
         <div>
           <dt className="font-medium">로그인한 계정</dt>
-          <dd className="text-zinc-600 dark:text-zinc-400">{user.email ?? "알 수 없음"}</dd>
+          <dd className="text-muted">{user.email ?? "알 수 없음"}</dd>
         </div>
       </dl>
-      <p className="text-xs text-zinc-500">낯선 이름이나 주소라면 승인하지 말고 거절하세요.</p>
-      {!owner && <p role="alert" className="text-sm text-red-600">이 계정은 Trail의 주인 계정이 아니라서 승인할 수 없습니다.</p>}
+      <p className="text-xs text-subtle">낯선 이름이나 주소라면 승인하지 말고 거절하세요.</p>
+      {!owner && <p role="alert" className="text-sm text-danger">이 계정은 Trail의 주인 계정이 아니라서 승인할 수 없습니다.</p>}
       <div className="flex gap-3">
         <form action={approve}>
           <input type="hidden" name="authorization_id" value={id} />
-          <button type="submit" disabled={!owner} className="rounded-full bg-black px-5 py-2 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-black">
+          <button type="submit" disabled={!owner} className="rounded-xl bg-accent-strong hover:bg-accent px-5 py-2 text-sm font-medium text-on-accent disabled:opacity-40">
             승인
           </button>
         </form>
         <form action={deny}>
           <input type="hidden" name="authorization_id" value={id} />
-          <button type="submit" className="rounded-full border border-black/15 px-5 py-2 text-sm font-medium dark:border-white/20">
+          <button type="submit" className="rounded-xl border border-line hover:bg-surface-hover px-5 py-2 text-sm font-medium">
             거절
           </button>
         </form>
@@ -89,5 +89,5 @@ async function Consent({ searchParams }: { searchParams: SearchParams }) {
 }
 
 function Message({ text }: { text: string }) {
-  return <p className="text-sm text-zinc-600 dark:text-zinc-400">{text}</p>;
+  return <p className="text-sm text-muted">{text}</p>;
 }

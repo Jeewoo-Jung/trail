@@ -1,26 +1,94 @@
 @import "tailwindcss";
 
+/*
+ * Trail 시각 디자인(DESIGN.md §12): Claude 나이트 모드의 색·글꼴·모서리·여백을 따른다.
+ * 항상 어두운 테마만 쓴다(밝은 모드 없음). 색은 아래 변수 한곳에서만 정하고, 화면에서는 bg-canvas·text-muted처럼 이름으로만 쓴다.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
+  --canvas: #262624; /* 본문 배경 */
+  --sidebar: #1f1e1d; /* 왼쪽 사이드바 배경 */
+  --surface: #30302e; /* 카드·입력칸 */
+  --surface-hover: #3a3a37;
+  --surface-active: #44443f;
+  --line: #3e3e3a; /* 테두리 */
+  --fg: #faf9f5; /* 기본 글자 */
+  --muted: #c2c0b6; /* 보조 글자 */
+  --subtle: #9c9a92; /* 흐린 글자 */
+  --accent: #d97757; /* 클로드 주황 */
+  --accent-strong: #c6613f; /* 주요 버튼 배경 */
+  --on-accent: #ffffff;
+  --danger: #ef8a80;
+  --warn: #e3b05a;
+  --info: #7fb1e0;
+  --ok: #8fc78f;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-canvas: var(--canvas);
+  --color-sidebar: var(--sidebar);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-active: var(--surface-active);
+  --color-line: var(--line);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-on-accent: var(--on-accent);
+  --color-danger: var(--danger);
+  --color-warn: var(--warn);
+  --color-info: var(--info);
+  --color-ok: var(--ok);
+  --font-sans: var(--font-inter), "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+  --font-serif: var(--font-newsreader), "AppleMyungjo", "Noto Serif KR", "Nanum Myeongjo", serif;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--canvas);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--canvas);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 제목은 Claude처럼 세리프체, 약간 가볍게 */
+h1,
+h2 {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  outline-offset: 2px;
+}
+
+input,
+textarea {
+  background: var(--surface);
+  color: var(--fg);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--subtle);
+}
+
+/* 얇고 어두운 스크롤바 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-active) transparent;
 }
