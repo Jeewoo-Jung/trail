@@ -41,3 +41,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 내 대화 기록 내보내기 파일 등 개인 자료(절대 커밋하지 않는다)
+/private-imports/
