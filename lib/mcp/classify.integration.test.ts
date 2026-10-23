@@ -20,6 +20,7 @@ describe.skipIf(!enabled)("분류 (실제 Supabase + 가짜/실제 Claude)", () 
   let client: SupabaseClient;
   const conversations: string[] = [];
   const createdSubs: string[] = [];
+  let preexistingSubs = new Set<string>();
 
   async function newCard(topicKey: string, summary: string) {
     const out = await recordCards(createSupabaseCardStore(client), {
@@ -34,12 +35,15 @@ describe.skipIf(!enabled)("분류 (실제 Supabase + 가짜/실제 Claude)", () 
     client = createClient(url!, key!);
     const { error } = await client.auth.signInWithPassword({ email: email!, password: password! });
     if (error) throw new Error("로그인하지 못했습니다.");
+    // 시험 전부터 있던 하위 개념(내가 승인한 것)은 절대 지우지 않는다.
+    preexistingSubs = new Set(((await client.from("sub_concepts").select("id")).data ?? []).map((r) => r.id));
   });
 
   afterAll(async () => {
     if (!client) return;
     if (conversations.length) await client.from("conversations").delete().in("key", conversations);
-    if (createdSubs.length) await client.from("sub_concepts").delete().in("id", createdSubs);
+    const toDelete = createdSubs.filter((id) => !preexistingSubs.has(id));
+    if (toDelete.length) await client.from("sub_concepts").delete().in("id", toDelete);
     // 시험이 만든 로그인만 끝낸다. 전체 로그아웃(global)이면 내가 브라우저에서 쓰는 로그인까지 끊긴다.
     await client.auth.signOut({ scope: "local" });
   });
