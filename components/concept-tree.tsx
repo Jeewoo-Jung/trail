@@ -6,31 +6,67 @@ import { cardsOfNode, type TopNode, type TreeCard } from "@/lib/rules/tree";
 
 const dateFormat = new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "numeric", day: "numeric" });
 
-export function ConceptTree({ tree, deleteCard }: { tree: TopNode[]; deleteCard?: (formData: FormData) => Promise<void> }) {
+type FormAction = (formData: FormData) => Promise<void>;
+
+export function ConceptTree({
+  tree,
+  deleteCard,
+  approveSub,
+  rejectSub,
+}: {
+  tree: TopNode[];
+  deleteCard?: FormAction;
+  approveSub?: FormAction;
+  rejectSub?: FormAction;
+}) {
   const [selected, setSelected] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   const cards = cardsOfNode(tree, selected);
   const total = cardsOfNode(tree, null).length;
 
+  const toggle = (key: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
   return (
-    <div className="grid gap-6 md:grid-cols-[16rem_1fr]">
+    <div className="grid gap-6 md:grid-cols-[18rem_1fr]">
       <nav aria-label="개념 트리" className="flex flex-col gap-1 text-sm">
-        <NodeButton active={selected === null} onClick={() => setSelected(null)} label="전체" count={total} />
-        {tree.map((top) => (
-          <div key={top.key} className="flex flex-col gap-1">
-            <NodeButton active={selected === top.key} onClick={() => setSelected(top.key)} label={top.name} count={top.count} strong />
-            {top.id !== null && top.subs.map((sub) => (
-              <NodeButton
-                key={sub.key}
-                active={selected === sub.key}
-                onClick={() => setSelected(sub.key)}
-                label={sub.name}
-                count={sub.cards.length}
-                indent
-                badge={sub.proposed ? "제안" : undefined}
+        <NodeRow active={selected === null} onSelect={() => setSelected(null)} label="전체" count={total} />
+        {tree.map((top) => {
+          const foldable = top.id !== null; // "미분류"는 하위가 하나뿐이라 접을 것이 없다
+          const open = !collapsed.has(top.key);
+          return (
+            <div key={top.key} className="flex flex-col gap-1">
+              <NodeRow
+                active={selected === top.key}
+                onSelect={() => setSelected(top.key)}
+                label={top.name}
+                count={top.count}
+                strong
+                expanded={foldable ? open : undefined}
+                onToggle={foldable ? () => toggle(top.key) : undefined}
               />
-            ))}
-          </div>
-        ))}
+              {foldable &&
+                open &&
+                top.subs.map((sub) => (
+                  <NodeRow
+                    key={sub.key}
+                    active={selected === sub.key}
+                    onSelect={() => setSelected(sub.key)}
+                    label={sub.name}
+                    count={sub.cards.length}
+                    indent
+                    badge={sub.proposed ? "제안" : undefined}
+                    proposal={sub.proposed && sub.id && approveSub && rejectSub ? { subId: sub.id, approve: approveSub, reject: rejectSub } : undefined}
+                  />
+                ))}
+            </div>
+          );
+        })}
       </nav>
 
       <section aria-label="카드 목록" className="flex flex-col gap-3">
@@ -44,20 +80,61 @@ export function ConceptTree({ tree, deleteCard }: { tree: TopNode[]; deleteCard?
   );
 }
 
-function NodeButton(props: { active: boolean; onClick: () => void; label: string; count: number; strong?: boolean; indent?: boolean; badge?: string }) {
+function NodeRow(props: {
+  active: boolean;
+  onSelect: () => void;
+  label: string;
+  count: number;
+  strong?: boolean;
+  indent?: boolean;
+  badge?: string;
+  /** 접고 펼 수 있는 노드면 현재 펼쳐져 있는지. 없으면 접을 수 없는 노드다. */
+  expanded?: boolean;
+  onToggle?: () => void;
+  proposal?: { subId: string; approve: FormAction; reject: FormAction };
+}) {
   return (
-    <button
-      type="button"
-      onClick={props.onClick}
-      aria-current={props.active ? "true" : undefined}
-      className={`flex items-center justify-between rounded-lg px-3 py-1.5 text-left ${props.indent ? "ml-4" : ""} ${props.strong ? "font-semibold" : ""} ${props.active ? "bg-black/10 dark:bg-white/15" : "hover:bg-black/5 dark:hover:bg-white/10"}`}
-    >
-      <span className="flex items-center gap-2">
-        {props.label}
-        {props.badge && <span className="rounded-full border border-amber-500 px-1.5 text-xs text-amber-700 dark:text-amber-400">{props.badge}</span>}
-      </span>
-      <span className="text-xs text-zinc-500">{props.count}</span>
-    </button>
+    <div className={`flex flex-col gap-1 rounded-lg ${props.indent ? "ml-4" : ""} ${props.active ? "bg-black/10 dark:bg-white/15" : "hover:bg-black/5 dark:hover:bg-white/10"}`}>
+      <div className="flex items-center">
+        {props.onToggle ? (
+          <button
+            type="button"
+            onClick={props.onToggle}
+            aria-expanded={props.expanded}
+            aria-label={`${props.label} ${props.expanded ? "접기" : "펼치기"}`}
+            className="w-6 shrink-0 py-1.5 text-center text-xs text-zinc-500"
+          >
+            {props.expanded ? "▾" : "▸"}
+          </button>
+        ) : (
+          <span className="w-6 shrink-0" aria-hidden />
+        )}
+        <button
+          type="button"
+          onClick={props.onSelect}
+          aria-current={props.active ? "true" : undefined}
+          className={`flex flex-1 items-center justify-between py-1.5 pr-3 text-left ${props.strong ? "font-semibold" : ""}`}
+        >
+          <span className="flex items-center gap-2">
+            {props.label}
+            {props.badge && <span className="rounded-full border border-amber-500 px-1.5 text-xs text-amber-700 dark:text-amber-400">{props.badge}</span>}
+          </span>
+          <span className="text-xs text-zinc-500">{props.count}</span>
+        </button>
+      </div>
+      {props.proposal && (
+        <div className="flex gap-2 pb-1.5 pl-6">
+          <form action={props.proposal.approve}>
+            <input type="hidden" name="sub_id" value={props.proposal.subId} />
+            <button type="submit" className="rounded-full bg-black px-3 py-0.5 text-xs font-medium text-white dark:bg-white dark:text-black">승인</button>
+          </form>
+          <form action={props.proposal.reject}>
+            <input type="hidden" name="sub_id" value={props.proposal.subId} />
+            <button type="submit" className="rounded-full border border-black/15 px-3 py-0.5 text-xs font-medium dark:border-white/20">거절</button>
+          </form>
+        </div>
+      )}
+    </div>
   );
 }
 
