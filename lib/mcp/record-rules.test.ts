@@ -17,12 +17,12 @@ describe("extractRules", () => {
 });
 
 describe("loadRecordRules", () => {
-  it("실제 규칙 문서를 읽어 주제 목록 안내와 함께 돌려준다", async () => {
+  it("실제 규칙 문서를 읽어 목록 안내와 함께 돌려준다", async () => {
     const rules = await loadRecordRules();
     expect(rules).toContain("Trail 기록 규칙");
     expect(rules).toContain("list_cards");
     expect(rules?.endsWith(RULES_NOTE)).toBe(true);
-    expect(RULES_NOTE).toContain("projectTopics");
+    expect(RULES_NOTE).toContain("activities");
     expect(RULES_NOTE).not.toContain("사용자 지침");
   });
 });

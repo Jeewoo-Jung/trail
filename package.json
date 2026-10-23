@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run --passWithNoTests",
-    "test:integration": "node --env-file=.env --env-file=.env.local node_modules/vitest/vitest.mjs run --no-file-parallelism --testTimeout=30000 lib/mcp/supabase-store.integration.test.ts lib/mcp/classify.integration.test.ts lib/my/tree-proposals.integration.test.ts lib/my/import-apply.integration.test.ts lib/my/nodes.integration.test.ts"
+    "test:integration": "node --env-file=.env --env-file=.env.local node_modules/vitest/vitest.mjs run --no-file-parallelism --testTimeout=30000 lib/mcp/supabase-store.integration.test.ts lib/mcp/classify.integration.test.ts lib/my/tree-proposals.integration.test.ts lib/my/import-apply.integration.test.ts lib/my/nodes.integration.test.ts lib/mcp/record-activities.integration.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.1.0",

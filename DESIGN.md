@@ -486,6 +486,19 @@ PLAN 29에서 정했다. 이전에 따뜻한 차콜(테라코타 포인트)이�
 - 질문 한 번에: 기록 여부 + 활동 이름·기간 제안 + "기존 활동에 이어붙이기(후보 목록) / 새 활동" + 위치(상위 노드) 선택. 후보는 `list_cards`(또는 새 조회)가 돌려준다.
 - 마무리·제출·최종본 언급 시 결과를 묻고(37번), 새 채팅이 기존 프로젝트와 이어지면 결과가 비어 있는 활동을 확인해 활동당 최대 1회 묻는다.
 
+### 14.4-1 커넥터 도구 명세 (33번에서 확정, 구현 완료)
+
+| 도구 | 입력 | 출력 |
+|---|---|---|
+| `list_cards` | `conversationKey?` | `conversationKey`, `questionCount`(이 대화에서 물은 횟수), `askedTopics`(이미 물은 주제), `activities`(이어붙일 활동·세부활동 최대 40개: id·종류·경로·기간·채워진 항목·잠긴 항목), `places`(새 활동을 둘 범주·프로젝트·활동 최대 40개: id·종류·경로). 휴지통·제외(조상 포함) 노드는 뺀다. 요약·근거 내용은 돌려주지 않는다 |
+| `record_cards` | `conversationKey?`, `questionCount?`(0~3), `topicKey?`, `activities[]`(최대 5) | `conversationKey`, 활동별 `results[]`: `status`(created/updated/rejected), `nodeId`, `name`, `fields`(situation·task·action·result_conversation별 set/appended/suggested/skipped/dropped), `outputsAdded`, `notes`, `reasons` |
+| `get_record_rules` | 없음 | `instructions/trail-record-rules.md`의 붙여 넣기 구간 + 목록 안내 한 줄 |
+
+- 활동 입력: `nodeId`(이어붙이기) 또는 `name`(새 활동) + `kind`(activity·subactivity·study) + `description`·`startDate`·`endDate` + 위치 `parentId`(places의 id) 또는 `projectName`(같은 이름의 최상위 프로젝트가 있으면 재사용, 없으면 새로 만듦, 공백·대소문자 무시) + `fields`(네 항목, 각 `text`·`subject`·`evidence[]`) + `outputs[]`(이름, http(s) 링크, 최대 5개).
+- 처리 순서: 대화 열기/발급 → 활동마다 [새 노드 만들기(종류·단계·개수 규칙) 또는 기존 노드 확인] → 기간(잠기지 않았을 때만 넓힘) → 항목별 검사(`checkField` 'ai': 한도·주체·근거 필수) → 병합(`mergeField`) → 산출물 → 하나라도 저장됐으면 `topicKey` 질문 기록. 활동별로 따로 처리하므로 일부가 거절돼도 나머지는 저장된다.
+- 키·토큰 모양은 이름·설명·항목·근거·산출물·링크 모두 저장 전에 가린다. 저장소 오류 문구는 돌려주지 않는다(일반 문구만).
+- 제거된 것: 분류기 호출(`after()` 후처리), 카드 분류 후보, 프로젝트 주제·항상 제외 목록 조회·저장. 옛 `lib/mcp`의 카드 코드와 `lib/claude/classifier`는 화면(34번)이 새 모델로 바뀔 때 `trash-can`으로 옮긴다.
+
 ### 14.5 화면 (34·38번)
 - **기본: 트리 뷰** — 노드마다 접기/펼치기, 종류 배지, 포트폴리오 상태, 잠금 표시. 노드를 고르면 오른쪽에 활동 카드(STAR 각 항목: 내용·주체 배지·근거 목록, 외부 결과, 산출물 목록)가 나오고 **모든 필드가 인라인 편집**이다. 상위 변경(이동), 쪼개기/합치기, 수동 활동 추가, 삭제·휴지통, 제외 토글.
 - **필드 제안 목록**: 활동별로 잠긴 필드에 대한 제안을 수락/거절.
