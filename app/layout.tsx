@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
-// 글꼴(Pretendard·Noto Serif KR·JetBrains Mono)은 npm 패키지를 globals.css에서 불러와 같은 서버에서 내보낸다(외부 호출 없음).
+// 글꼴은 기기의 시스템 글꼴을 쓴다(애플 기기는 SF Pro·애플 SD 고딕). 따로 내려받는 글꼴이 없어 빠르고 외부 호출도 없다.
 
 export const metadata: Metadata = {
   title: "Trail",

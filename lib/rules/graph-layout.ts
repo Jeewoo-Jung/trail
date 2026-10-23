@@ -192,5 +192,5 @@ export function zoomAt(t: ViewTransform, factor: number, px: number, py: number,
 }
 
 /** 색: 상위 개념마다 하나씩(Glass Iris 팔레트: 파랑·보라·청록 계열). */
-export const GROUP_COLORS = ["#d97757", "#c9a55c", "#8faf8a", "#8ea4b8", "#b994b8", "#7fb3a8", "#d08a9c", "#a8a06a"] as const;
+export const GROUP_COLORS = ["#0a84ff", "#30d158", "#ff9f0a", "#bf5af2", "#ff453a", "#64d2ff", "#ffd60a", "#ff6482"] as const;
 export const groupColor = (group: number): string => GROUP_COLORS[group % GROUP_COLORS.length];

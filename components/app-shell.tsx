@@ -17,7 +17,7 @@ const NAV: { href: string; label: string; icon: LucideIcon }[] = [
 ];
 
 const isActive = (pathname: string, href: string) => (href === "/my" ? pathname === "/my" : pathname.startsWith(href));
-const tile = (active: boolean) => `grid h-9 w-9 place-items-center rounded-xl ${active ? "bg-surface-active text-fg ring-1 ring-line-strong" : "text-muted hover:bg-surface-hover hover:text-fg"}`;
+const tile = (active: boolean) => `grid h-9 w-9 place-items-center rounded-xl ${active ? "bg-surface-active text-fg" : "text-muted hover:bg-surface-hover hover:text-fg"}`;
 
 export function AppShell({ email, logout, children }: { email: string | null; logout: () => Promise<void>; children: React.ReactNode }) {
   const pathname = usePathname();
@@ -37,16 +37,16 @@ export function AppShell({ email, logout, children }: { email: string | null; lo
     <div className="flex min-h-screen">
       {/* 넓은 화면: 왼쪽 아이콘 레일 */}
       <aside className="sticky top-0 hidden h-screen w-14 shrink-0 flex-col items-center gap-3 border-r border-line bg-sidebar py-3 md:flex">
-        <Link href="/my" aria-label="Trail 홈" className="grid h-9 w-9 place-items-center rounded-xl text-accent">
+        <Link href="/my" aria-label="Trail 홈" className="grid h-9 w-9 place-items-center rounded-xl text-fg">
           <TrailMark size={24} />
         </Link>
         <nav aria-label="주 메뉴" className="mt-2 flex flex-col gap-2">{links}</nav>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-sidebar/80 px-4 py-2.5 backdrop-blur md:px-6">
+        <header className="sticky top-0 z-30 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line nav-blur px-4 py-2 md:px-6">
           <Link href="/my" className="flex items-center gap-2 md:hidden" aria-label="Trail 홈">
-            <TrailMark size={22} className="text-accent" />
+            <TrailMark size={22} className="text-fg" />
             <span className="text-lg font-semibold text-fg">Trail</span>
           </Link>
           <nav aria-label="현재 위치" className="hidden items-center gap-2 text-sm text-muted md:flex">
@@ -58,7 +58,7 @@ export function AppShell({ email, logout, children }: { email: string | null; lo
           <div className="ml-auto flex items-center gap-3">
             <div className="rounded-full border border-line px-3 py-1.5"><RealtimeStatus /></div>
             <div className="relative">
-              <button type="button" onClick={() => setMenuOpen((v) => !v)} aria-expanded={menuOpen} aria-haspopup="menu" aria-label="내 메뉴" className="grid h-9 w-9 place-items-center rounded-full border border-line-strong bg-surface-hover text-sm font-medium text-fg">
+              <button type="button" onClick={() => setMenuOpen((v) => !v)} aria-expanded={menuOpen} aria-haspopup="menu" aria-label="내 메뉴" className="grid h-9 w-9 place-items-center rounded-full bg-surface-active text-sm font-medium text-fg">
                 {(email ?? "?").slice(0, 1).toUpperCase()}
               </button>
               {menuOpen && (

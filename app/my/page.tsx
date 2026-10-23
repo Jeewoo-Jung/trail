@@ -20,7 +20,7 @@ export default function MyPage() {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 md:px-6">
       <header className="flex flex-col gap-1 pb-2">
-        <h1 className="text-2xl">내 기록</h1>
+        <h1 className="text-4xl font-semibold">내 기록</h1>
         <p className="max-w-xl text-sm text-muted">Claude와 나눈 대화의 결정이 개념 트리로 모입니다. 새 개념은 승인해야 확정돼요.</p>
       </header>
       <Suspense fallback={<p className="text-sm text-subtle">불러오는 중…</p>}>
