@@ -1,12 +1,12 @@
 // 공통 작은 부품(Button 모양·Badge·Skeleton·EmptyState). 색과 모서리는 globals.css의 토큰만 쓴다.
 import type { ReactNode } from "react";
 
-const BUTTON_BASE = "inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-1.5 text-xs font-medium disabled:opacity-50";
+const BUTTON_BASE = "inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium disabled:opacity-50";
 /** 버튼 모양 글자 묶음. primary는 한 화면에 하나만(포인트색), 나머지는 secondary. */
 export const buttonClass = {
   primary: `${BUTTON_BASE} bg-brand text-on-accent`,
-  secondary: `${BUTTON_BASE} border border-line-strong text-fg hover:bg-surface-hover`,
-  danger: `${BUTTON_BASE} border border-danger/50 text-danger hover:bg-danger/10`,
+  secondary: `${BUTTON_BASE} border border-accent text-accent hover:bg-accent-soft`,
+  danger: `${BUTTON_BASE} bg-danger text-white hover:opacity-90`,
 } as const;
 
 const TONES = {

@@ -9,7 +9,7 @@ export default function LoginPage({ searchParams }: { searchParams: SearchParams
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-sm flex-col justify-center gap-8 px-6 py-16">
       <header className="flex flex-col items-center gap-3 text-center">
-        <TrailMark size={36} className="text-accent" />
+        <TrailMark size={36} className="text-fg" />
         <h1 className="text-4xl">Trail</h1>
         <p className="text-muted">내 기록을 보려면 로그인하세요.</p>
       </header>
@@ -56,7 +56,7 @@ async function LoginForm({ searchParams }: { searchParams: SearchParams }) {
       )}
       <button
         type="submit"
-        className="rounded-xl bg-brand px-5 py-2.5 font-medium text-on-accent transition-colors "
+        className="rounded-full bg-brand px-5 py-2.5 font-medium text-on-accent transition-colors "
       >
         로그인
       </button>

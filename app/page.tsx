@@ -10,26 +10,31 @@ export default function Home() {
   const tree = buildTree(SAMPLE_CARDS, SAMPLE_CONCEPTS);
   return (
     <>
-      <div role="note" className="bg-warn/15 px-6 py-2 text-center text-sm font-medium text-warn">
+      <div role="note" className="bg-surface-active px-4 py-2 text-center text-xs text-muted">
         가상 샘플입니다. 내 기록이 아닙니다.
       </div>
-      <header className="border-b border-line bg-sidebar">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-3">
+      <header className="nav-blur sticky top-0 z-30 border-b border-line">
+        <div className="mx-auto flex h-12 w-full max-w-5xl items-center justify-between px-4 md:px-6">
           <span className="flex items-center gap-2">
-            <TrailMark size={24} className="text-accent" />
-            <span className="text-xl font-semibold text-fg">Trail</span>
+            <TrailMark size={22} className="text-fg" />
+            <span className="text-base font-semibold text-fg">Trail</span>
           </span>
-          <Link href="/login" className="rounded-xl bg-brand px-4 py-2 text-sm font-medium text-on-accent">
+          <Link href="/login" className="rounded-full bg-brand px-4 py-1 text-sm font-medium text-on-accent">
             로그인
           </Link>
         </div>
       </header>
-      <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 md:px-6">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-3xl">개념 트리 둘러보기</h1>
-          <p className="max-w-2xl text-muted">Claude와 나눈 대화에서 정한 결정을 개념 트리로 모아 보는 개인용 앱입니다. 아래는 지어낸 예시입니다.</p>
-        </div>
-        <ConceptTree tree={tree} />
+      <main className="mx-auto flex w-full max-w-5xl flex-col gap-16 px-4 pb-24 pt-16 md:px-6 md:pt-24">
+        <section className="flex flex-col items-center gap-5 text-center">
+          <h1 className="text-5xl font-semibold md:text-7xl">개념 트리 둘러보기</h1>
+          <p className="max-w-2xl text-xl text-muted md:text-2xl">Claude와 나눈 대화에서 정한 결정을 개념 트리로 모아 봅니다. 아래는 지어낸 예시입니다.</p>
+          <Link href="/login" className="text-lg text-accent hover:underline">
+            내 기록 보러 가기 ›
+          </Link>
+        </section>
+        <section className="rounded-[1.75rem] bg-surface p-5 md:p-8">
+          <ConceptTree tree={tree} />
+        </section>
       </main>
     </>
   );

@@ -165,7 +165,7 @@ export function Mindmap({ tree }: { tree: ConceptNode[] }) {
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
-      <div className="relative overflow-hidden rounded-2xl border border-line bg-canvas">
+      <div className="relative overflow-hidden rounded-2xl border border-line bg-[#1d1d1f]">
         <svg
           ref={svgRef}
           viewBox={`0 0 ${size.w} ${size.h}`}
@@ -184,12 +184,12 @@ export function Mindmap({ tree }: { tree: ConceptNode[] }) {
               const b = graph.nodes.find((n) => n.id === e.target);
               if (!a || !b) return null;
               const lit = near ? near.has(a.id) && near.has(b.id) : true;
-              return <line key={`${e.source}>${e.target}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={lit && near ? groupColor(a.group) : "#52504b"} strokeOpacity={near ? (lit ? 0.9 : 0.1) : 0.7} strokeWidth={lit && near ? 1.8 / view.k + 0.4 : 1.2 / view.k + 0.3} />;
+              return <line key={`${e.source}>${e.target}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={lit && near ? groupColor(a.group) : "#48484a"} strokeOpacity={near ? (lit ? 0.9 : 0.1) : 0.7} strokeWidth={lit && near ? 1.8 / view.k + 0.4 : 1.2 / view.k + 0.3} />;
             })}
             {graph.nodes.map((n) => {
               const dim = (near && !near.has(n.id)) || (matches && !matches.has(n.id));
               const isSel = selected === n.id;
-              const color = n.kind === "top" ? groupColor(n.group) : "#85827a";
+              const color = n.kind === "top" ? groupColor(n.group) : "#8e8e93";
               return (
                 <g
                   key={n.id}
@@ -210,13 +210,13 @@ export function Mindmap({ tree }: { tree: ConceptNode[] }) {
                   <circle
                     cx={n.x} cy={n.y} r={n.r}
                     fill={n.proposed ? "none" : color}
-                    stroke={isSel ? "#f0eee6" : n.proposed ? "#d4a85a" : "none"}
+                    stroke={isSel ? "#f5f5f7" : n.proposed ? "#ff9f0a" : "none"}
                     strokeWidth={(isSel ? 2.4 : 1.8) / view.k + 0.2}
                     strokeDasharray={n.proposed && !isSel ? "3 2" : undefined}
                   />
                   {n.hidden > 0 && <circle cx={n.x} cy={n.y} r={n.r + 4} fill="none" stroke={color} strokeOpacity={0.5} strokeDasharray="2 3" strokeWidth={1 / view.k + 0.3} />}
                   {showLabel(n.id) && (
-                    <text x={n.x} y={n.y + n.r + 13 / view.k + 2} textAnchor="middle" fontSize={Math.max(11, 12 / view.k)} fill={isSel || n.id === active ? "#f0eee6" : "#b7b4ab"} className="pointer-events-none">
+                    <text x={n.x} y={n.y + n.r + 13 / view.k + 2} textAnchor="middle" fontSize={Math.max(11, 12 / view.k)} fill={isSel || n.id === active ? "#f5f5f7" : "#a1a1a6"} className="pointer-events-none">
                       {n.label}{n.hidden ? ` (+${n.hidden})` : ""}
                     </text>
                   )}

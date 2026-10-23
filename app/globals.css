@@ -1,31 +1,55 @@
 @import "tailwindcss";
 
 /*
- * Trail 시각 디자인(DESIGN.md §12) — "따뜻한 차콜": 순수 검정·흰색 없이 따뜻한 회갈색 바탕에 테라코타 포인트 하나.
- * 항상 어두운 테마만 쓴다. 색은 아래 변수 한곳에서만 정하고, 화면에서는 bg-canvas·text-muted처럼 이름으로만 쓴다.
- * 포인트색(accent)은 한 화면에 3곳 이내로만 쓴다(주요 버튼, 선택 표시, 새 카드 점).
+ * Trail 시각 디자인(DESIGN.md §12) — 애플 홈페이지를 참고한 밝고 조용한 테마: 흰 면과 옅은 회색 바탕, 검정에 가까운 글자, 파랑 포인트 하나, 알약 버튼, 넓은 여백.
+ * 기기가 어두운 화면 설정이면 애플처럼 검정 바탕으로 바뀐다(prefers-color-scheme). 색은 아래 변수 한곳에서만 정하고, 화면에서는 bg-canvas·text-muted처럼 이름으로만 쓴다.
  * 글자 대비(WCAG AA 4.5:1 이상): fg·muted는 모든 바탕에서 통과, subtle은 큰 글씨·보조 표시에만 쓴다.
  */
 :root {
-  color-scheme: dark;
-  --canvas: #1f1e1d; /* 페이지 바탕 (bg-base) */
-  --sidebar: #262624; /* 사이드바·상단 바 (bg-surface) */
-  --surface: #262624; /* 카드·입력칸 */
-  --surface-hover: #30302e; /* 떠 있는 면 (bg-elevated) */
-  --surface-active: #3a3936; /* 눌림·선택 (bg-hover) */
-  --line: #3e3d39; /* 옅은 테두리 */
-  --line-strong: #52504b;
-  --fg: #f0eee6; /* 본문 글자 (text-primary) */
-  --muted: #b7b4ab; /* 보조 글자 (text-secondary) */
-  --subtle: #85827a; /* 흐린 글자 (text-tertiary) */
-  --accent: #d97757; /* 테라코타 */
-  --accent-strong: #e08a6d; /* 포인트 위에 올릴 때(hover) */
-  --accent-soft: rgba(217, 119, 87, 0.14);
-  --on-accent: #1f1e1d; /* 포인트색 위 글자(흰색은 대비가 모자라 어두운 색을 쓴다) */
-  --danger: #d46a6a; /* 오류·삭제 */
-  --warn: #d4a85a; /* 제안·대기 */
-  --info: #8ea4b8;
-  --ok: #7fa37a;
+  color-scheme: light dark;
+  --canvas: #f5f5f7; /* 페이지 바탕 */
+  --sidebar: #fbfbfd; /* 왼쪽 줄·상단 바 */
+  --nav-bg: rgba(251, 251, 253, 0.8); /* 위쪽 바: 반투명 + 흐림 */
+  --surface: #ffffff; /* 카드·입력칸 */
+  --surface-hover: #f0f0f3;
+  --surface-active: #e8e8ed;
+  --line: #d2d2d7;
+  --line-strong: #b4b4ba;
+  --fg: #1d1d1f; /* 본문 글자 */
+  --muted: #6e6e73; /* 보조 글자 */
+  --subtle: #86868b; /* 흐린 글자 */
+  --accent: #0071e3; /* 파랑(버튼·링크) */
+  --accent-strong: #0077ed; /* 눌러 볼 때 */
+  --accent-soft: rgba(0, 113, 227, 0.12);
+  --on-accent: #ffffff;
+  --danger: #d70015;
+  --warn: #b25000;
+  --info: #0066cc;
+  --ok: #248a3d;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #000000;
+    --sidebar: #1d1d1f;
+    --nav-bg: rgba(29, 29, 31, 0.72);
+    --surface: #1d1d1f;
+    --surface-hover: #2c2c2e;
+    --surface-active: #3a3a3c;
+    --line: #424245;
+    --line-strong: #5a5a5e;
+    --fg: #f5f5f7;
+    --muted: #a1a1a6;
+    --subtle: #86868b;
+    --accent: #2997ff;
+    --accent-strong: #4aa8ff;
+    --accent-soft: rgba(41, 151, 255, 0.18);
+    --on-accent: #ffffff;
+    --danger: #ff453a;
+    --warn: #ff9f0a;
+    --info: #64a8ff;
+    --ok: #30d158;
+  }
 }
 
 @theme inline {
@@ -42,16 +66,17 @@
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
   --color-accent-soft: var(--accent-soft);
+  --color-nav: var(--nav-bg);
   --color-on-accent: var(--on-accent);
   --color-danger: var(--danger);
   --color-warn: var(--warn);
   --color-info: var(--info);
   --color-ok: var(--ok);
-  --font-sans: var(--font-inter-tight), "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
-  --font-serif: var(--font-inter-tight), "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
-  --radius-lg: 0.5rem;
-  --radius-xl: 0.625rem; /* 버튼 */
-  --radius-2xl: 0.75rem; /* 카드 */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", system-ui, sans-serif;
+  --font-serif: var(--font-sans);
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.75rem; /* 입력칸·작은 면 */
+  --radius-2xl: 1.125rem; /* 카드 */
 }
 
 html {
@@ -70,16 +95,25 @@ h1,
 h2,
 h3 {
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.022em;
+  line-height: 1.12;
 }
 
-/* 떠 있는 면(메뉴 등): 반투명 유리 대신 한 단계 밝은 면 */
+/* 떠 있는 면(메뉴 등) */
 .glass {
-  background: var(--surface-hover);
+  background: var(--surface);
   border: 1px solid var(--line);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
 }
 
-/* 주요 버튼: 테라코타 한 가지 색. 눌러 볼 때만 살짝 밝아진다 */
+/* 위쪽 바: 애플처럼 반투명하고 뒤가 흐리게 비친다 */
+.nav-blur {
+  background: var(--nav-bg);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+}
+
+/* 주요 버튼: 파랑 알약 한 가지. 눌러 볼 때만 살짝 밝아진다 */
 .bg-brand {
   background-color: var(--accent);
   transition: background-color 150ms ease-out;
@@ -88,7 +122,7 @@ h3 {
   background-color: var(--accent-strong);
 }
 
-/* 근거 발췌 인용: 왼쪽 테라코타 선 */
+/* 근거 발췌 인용: 왼쪽 포인트색 선 */
 .quote-block {
   border-left: 2px solid var(--accent);
   padding-left: 0.75rem;
@@ -112,7 +146,7 @@ select {
 }
 
 ::selection {
-  background: rgba(217, 119, 87, 0.4);
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 :focus-visible {
@@ -149,10 +183,10 @@ textarea::placeholder {
 }
 @keyframes dot-glow {
   0% {
-    box-shadow: 0 0 0 0 rgba(217, 119, 87, 0.55);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
   }
   100% {
-    box-shadow: 0 0 0 10px rgba(217, 119, 87, 0);
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--accent) 0%, transparent);
   }
 }
 

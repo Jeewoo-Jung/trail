@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
-import { Inter_Tight } from "next/font/google";
 import "./globals.css";
 
-// 글꼴은 Inter Tight 하나(400·500·600). 한글은 기기에 있는 글꼴(애플 SD 고딕 등)로 보인다.
-const interTight = Inter_Tight({ variable: "--font-inter-tight", subsets: ["latin"], weight: ["400", "500", "600"], display: "swap" });
+// 글꼴은 기기의 시스템 글꼴을 쓴다(애플 기기는 SF Pro·애플 SD 고딕). 따로 내려받는 글꼴이 없어 빠르고 외부 호출도 없다.
 
 export const metadata: Metadata = {
   title: "Trail",
@@ -12,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ko" className={`${interTight.variable} h-full antialiased`}>
+    <html lang="ko" className="h-full antialiased">
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
