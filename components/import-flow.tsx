@@ -93,10 +93,10 @@ export function ImportFlow() {
             ))}
           </ul>
           <div className="flex gap-2">
-            <button type="button" onClick={onSend} disabled={pending} className="rounded-xl bg-brand hover:brightness-110 px-5 py-2 text-sm font-medium text-on-accent disabled:opacity-50">
+            <button type="button" onClick={onSend} disabled={pending} className="rounded-xl bg-brand px-5 py-2 text-sm font-medium text-on-accent disabled:opacity-50">
               {pending ? "추천 받는 중…" : "이 내용으로 추천 받기"}
             </button>
-            <button type="button" onClick={() => { setStep("pick"); setDigest(null); }} className="rounded-xl border border-line hover:bg-surface-hover px-5 py-2 text-sm">다른 파일</button>
+            <button type="button" onClick={() => { setStep("pick"); setDigest(null); }} className="rounded-xl border border-line-strong hover:bg-surface-hover px-5 py-2 text-sm">다른 파일</button>
           </div>
         </div>
       )}
@@ -106,7 +106,7 @@ export function ImportFlow() {
           <p className="text-sm text-muted">체크한 항목만 저장됩니다. 이미 있는 항목은 제외돼 있습니다.</p>
           <CandidateList title="상위 개념 후보" items={rec.topConcepts} checked={checkedTops} onToggle={(n) => toggle(checkedTops, setCheckedTops, n)} />
           <CandidateList title="프로젝트 주제 후보" items={rec.projectTopics} checked={checkedTopics} onToggle={(n) => toggle(checkedTopics, setCheckedTopics, n)} />
-          <button type="button" onClick={onSave} disabled={pending || (checkedTops.size === 0 && checkedTopics.size === 0)} className="self-start rounded-xl bg-brand hover:brightness-110 px-5 py-2 text-sm font-medium text-on-accent disabled:opacity-50">
+          <button type="button" onClick={onSave} disabled={pending || (checkedTops.size === 0 && checkedTopics.size === 0)} className="self-start rounded-xl bg-brand px-5 py-2 text-sm font-medium text-on-accent disabled:opacity-50">
             {pending ? "저장하는 중…" : "승인한 항목 저장"}
           </button>
         </div>

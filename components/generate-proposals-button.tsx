@@ -6,7 +6,7 @@ import { useFormStatus } from "react-dom";
 export function GenerateProposalsButton() {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" disabled={pending} className="rounded-xl border border-line hover:bg-surface-hover px-4 py-1.5 text-xs font-medium disabled:opacity-50">
+    <button type="submit" disabled={pending} className="rounded-xl border border-line-strong hover:bg-surface-hover px-4 py-1.5 text-xs font-medium disabled:opacity-50">
       {pending ? "제안 만드는 중…" : "정리 제안 받기"}
     </button>
   );

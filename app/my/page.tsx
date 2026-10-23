@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { createClaudeClassifier } from "@/lib/claude/classifier";
 import { ConceptTree } from "@/components/concept-tree";
-import { Orb } from "@/components/orb";
+import { Badge, buttonClass } from "@/components/ui";
 import { loadTree } from "@/lib/my/load-tree";
 import { classifyPendingThenWaiting } from "@/lib/mcp/classify-card";
 import { createSupabaseClassifyStore } from "@/lib/mcp/supabase-classify-store";
@@ -18,13 +18,11 @@ import { approveConcept, approveTreeProposal, deleteCard, rejectConcept, rejectT
 
 export default function MyPage() {
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
-      <div className="flex flex-col items-center gap-4 pb-4 pt-2 text-center">
-        <Orb />
-        <p className="text-muted">안녕하세요, 오늘도 기록을 이어 가 볼까요?</p>
-        <h1 className="text-3xl uppercase tracking-wide md:text-4xl">내 기록을 한눈에</h1>
-        <p className="max-w-md text-sm text-subtle">Claude와 나눈 대화의 결정이 개념 트리로 모입니다. 새 하위 개념은 승인해야 확정돼요.</p>
-      </div>
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 md:px-6">
+      <header className="flex flex-col gap-1 pb-2">
+        <h1 className="text-2xl">내 기록</h1>
+        <p className="max-w-xl text-sm text-muted">Claude와 나눈 대화의 결정이 개념 트리로 모입니다. 새 개념은 승인해야 확정돼요.</p>
+      </header>
       <Suspense fallback={<p className="text-sm text-subtle">불러오는 중…</p>}>
         <SignedIn />
       </Suspense>
@@ -80,11 +78,11 @@ async function SignedIn() {
                 <span className="flex gap-2">
                   <form action={approveConcept}>
                     <input type="hidden" name="concept_id" value={p.conceptId} />
-                    <button type="submit" className="rounded-xl bg-brand hover:brightness-110 px-4 py-1 text-xs font-medium text-on-accent">승인</button>
+                    <button type="submit" className={buttonClass.primary}>승인</button>
                   </form>
                   <form action={rejectConcept}>
                     <input type="hidden" name="concept_id" value={p.conceptId} />
-                    <button type="submit" className="rounded-xl border border-line hover:bg-surface-hover px-4 py-1 text-xs font-medium">거절</button>
+                    <button type="submit" className={buttonClass.secondary}>거절</button>
                   </form>
                 </span>
               </li>
@@ -106,18 +104,18 @@ async function SignedIn() {
             {treeProposals.map((p) => (
               <li key={p.id} className="flex flex-col gap-2">
                 <p>
-                  <span className="mr-2 rounded-full border border-info px-2 py-0.5 text-xs text-info">{p.kind === "merge" ? "병합" : "분리"}</span>
+                  <span className="mr-2"><Badge tone="info">{p.kind === "merge" ? "병합" : "분리"}</Badge></span>
                   {describeProposal(p)}
                 </p>
                 <span className="flex gap-2">
                   <form action={approveTreeProposal}>
                     <input type="hidden" name="proposal_id" value={p.id} />
                     <input type="hidden" name="kind" value={p.kind} />
-                    <button type="submit" className="rounded-xl bg-brand hover:brightness-110 px-4 py-1 text-xs font-medium text-on-accent">승인</button>
+                    <button type="submit" className={buttonClass.primary}>승인</button>
                   </form>
                   <form action={rejectTreeProposal}>
                     <input type="hidden" name="proposal_id" value={p.id} />
-                    <button type="submit" className="rounded-xl border border-line hover:bg-surface-hover px-4 py-1 text-xs font-medium">거절</button>
+                    <button type="submit" className={buttonClass.secondary}>거절</button>
                   </form>
                 </span>
               </li>

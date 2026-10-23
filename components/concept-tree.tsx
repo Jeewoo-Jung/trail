@@ -1,9 +1,10 @@
 "use client";
 
 // Design Ref: DESIGN.md §3.2~3.3 — 왼쪽 개념 트리, 오른쪽 선택한 개념의 카드. 좁은 화면에서는 위아래로 쌓는다.
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { classificationLabel, cardsOfNode, findNode, type ConceptNode, type TreeCard } from "@/lib/rules/tree";
-
+import { Badge as UiBadge, buttonClass, EmptyState } from "@/components/ui";
 const dateFormat = new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "numeric", day: "numeric" });
 
 type FormAction = (formData: FormData) => Promise<void>;
@@ -66,7 +67,7 @@ export function ConceptTree({
       <section aria-label="카드 목록" className="flex flex-col gap-3">
         {selectedNode && selectedNode.path.length > 1 && <p className="text-xs text-subtle">{selectedNode.path.join(" › ")}</p>}
         {cards.length === 0 ? (
-          <p className="text-sm text-subtle">{total === 0 ? "아직 기록된 카드가 없습니다. Claude에서 기록하면 여기에 나타납니다." : "이 개념에는 카드가 없습니다."}</p>
+          <EmptyState title={total === 0 ? "아직 기록된 카드가 없습니다" : "이 개념에는 카드가 없습니다"}>{total === 0 ? "Claude에서 기록하면 여기에 나타납니다." : "다른 개념을 골라 보세요."}</EmptyState>
         ) : (
           cards.map((card) => <CardItem key={card.id} card={card} deleteCard={deleteCard} />)
         )}
@@ -90,7 +91,7 @@ function NodeRow(props: {
   proposal?: { id: string; approve: FormAction; reject: FormAction };
 }) {
   return (
-    <div style={{ marginLeft: `${(props.depth ?? 0) * 14}px` }} className={`flex flex-col gap-1 rounded-xl ${props.active ? "bg-surface-active" : "hover:bg-surface-hover"}`}>
+    <div style={{ marginLeft: `${(props.depth ?? 0) * 14}px` }} className={`flex flex-col gap-1 rounded-xl ${props.active ? "bg-surface-active ring-1 ring-line-strong" : "hover:bg-surface-hover"}`}>
       <div className="flex items-center">
         {props.onToggle ? (
           <button
@@ -100,7 +101,7 @@ function NodeRow(props: {
             aria-label={`${props.label} ${props.expanded ? "접기" : "펼치기"}`}
             className="w-6 shrink-0 py-1.5 text-center text-xs text-subtle"
           >
-            {props.expanded ? "▾" : "▸"}
+            {props.expanded ? <ChevronDown size={14} strokeWidth={1.5} aria-hidden className="mx-auto" /> : <ChevronRight size={14} strokeWidth={1.5} aria-hidden className="mx-auto" />}
           </button>
         ) : (
           <span className="w-6 shrink-0" aria-hidden />
@@ -113,20 +114,20 @@ function NodeRow(props: {
         >
           <span className="flex items-center gap-2">
             {props.label}
-            {props.badge && <span className="rounded-full border border-warn px-1.5 text-xs text-warn">{props.badge}</span>}
+            {props.badge && <UiBadge tone="warn">{props.badge}</UiBadge>}
           </span>
-          <span className="text-xs text-subtle">{props.count}</span>
+          <span className="font-mono text-xs text-subtle">{props.count}</span>
         </button>
       </div>
       {props.proposal && (
         <div className="flex gap-2 pb-1.5 pl-6">
           <form action={props.proposal.approve}>
             <input type="hidden" name="concept_id" value={props.proposal.id} />
-            <button type="submit" className="rounded-xl bg-brand hover:brightness-110 px-3 py-0.5 text-xs font-medium text-on-accent">승인</button>
+            <button type="submit" className={buttonClass.primary}>승인</button>
           </form>
           <form action={props.proposal.reject}>
             <input type="hidden" name="concept_id" value={props.proposal.id} />
-            <button type="submit" className="rounded-xl border border-line hover:bg-surface-hover px-3 py-0.5 text-xs font-medium">거절</button>
+            <button type="submit" className={buttonClass.secondary}>거절</button>
           </form>
         </div>
       )}
@@ -135,8 +136,7 @@ function NodeRow(props: {
 }
 
 function Badge({ text, tone }: { text: string; tone: "gray" | "amber" | "blue" }) {
-  const color = tone === "amber" ? "border-warn text-warn" : tone === "blue" ? "border-info text-info" : "border-line text-muted";
-  return <span className={`rounded-full border px-2 py-0.5 text-xs ${color}`}>{text}</span>;
+  return <UiBadge tone={tone === "amber" ? "warn" : tone === "blue" ? "info" : "neutral"}>{text}</UiBadge>;
 }
 
 export function CardItem({ card, deleteCard }: { card: TreeCard; deleteCard?: (formData: FormData) => Promise<void> }) {
@@ -144,25 +144,25 @@ export function CardItem({ card, deleteCard }: { card: TreeCard; deleteCard?: (f
   const [confirming, setConfirming] = useState(false);
   const classification = classificationLabel(card.path);
   return (
-    <article className="flex flex-col gap-2 rounded-xl border border-line p-4">
+    <article className="flex flex-col gap-2 rounded-2xl border border-line bg-surface p-4">
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex flex-col gap-1 text-left">
         <span className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{card.title}</span>
-          <span className="text-xs text-subtle">{dateFormat.format(new Date(card.createdAt))}</span>
+          <span className="font-mono text-xs text-subtle">{dateFormat.format(new Date(card.createdAt))}</span>
           {card.status === "pending" && <Badge text="분류 중" tone="blue" />}
           {card.status === "waiting" && <Badge text="미분류(대기)" tone="amber" />}
           {card.hasEstimate && <Badge text="추정" tone="amber" />}
           {card.noEvidence && <Badge text="근거 없음" tone="gray" />}
           {card.subUndecided && <Badge text="하위 미정" tone="gray" />}
         </span>
-        {card.summary !== "" && <span className="text-sm text-muted">{card.summary}</span>}
+        {card.summary !== "" && <span className="font-serif text-[15px] text-muted">{card.summary}</span>}
       </button>
       {open && (
         <div className="flex flex-col gap-2 border-t border-line pt-2 text-sm">
           {card.evidence.length > 0 && (
             <ul className="flex flex-col gap-1 text-muted">
               {card.evidence.map((e, i) => (
-                <li key={i} className="border-l-2 border-line pl-2">“{e}”</li>
+                <li key={i} className="quote-block font-serif">“{e}”</li>
               ))}
             </ul>
           )}
@@ -177,11 +177,11 @@ export function CardItem({ card, deleteCard }: { card: TreeCard; deleteCard?: (f
                 <form action={deleteCard} className="flex items-center gap-2">
                   <input type="hidden" name="card_id" value={card.id} />
                   <span className="text-xs text-danger">이 카드를 삭제합니다. 되돌릴 수 없습니다.</span>
-                  <button type="submit" className="rounded-full bg-danger px-3 py-1 text-xs font-medium text-on-accent">삭제</button>
-                  <button type="button" onClick={() => setConfirming(false)} className="rounded-xl border border-line hover:bg-surface-hover px-3 py-1 text-xs">취소</button>
+                  <button type="submit" className={buttonClass.danger}>삭제</button>
+                  <button type="button" onClick={() => setConfirming(false)} className={buttonClass.secondary}>취소</button>
                 </form>
               ) : (
-                <button type="button" onClick={() => setConfirming(true)} className="rounded-xl border border-line hover:bg-surface-hover px-3 py-1 text-xs">삭제</button>
+                <button type="button" onClick={() => setConfirming(true)} className={buttonClass.secondary}>삭제</button>
               )}
             </div>
           )}
