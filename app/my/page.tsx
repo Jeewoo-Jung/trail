@@ -12,7 +12,10 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { cardsOfNode, pendingProposals } from "@/lib/rules/tree";
 import { unclassifiedRatio } from "@/lib/rules/unclassified";
-import { approveSub, deleteCard, logout, rejectSub } from "./actions";
+import { GenerateProposalsButton } from "@/components/generate-proposals-button";
+import { listPendingProposals } from "@/lib/my/tree-proposals";
+import { describeProposal } from "@/lib/rules/tree-proposals";
+import { approveSub, approveTreeProposal, deleteCard, logout, rejectSub, rejectTreeProposal, requestTreeProposals } from "./actions";
 
 export default function MyPage() {
   return (
@@ -33,6 +36,7 @@ async function SignedIn() {
   const supabase = await createClient();
   const { tree } = await loadTree(supabase);
   const proposals = pendingProposals(tree);
+  const treeProposals = await listPendingProposals(supabase);
   const ratio = unclassifiedRatio(cardsOfNode(tree, null));
 
   // 화면을 연 김에, 한도 때문에 미뤄 둔 "미분류(대기)" 카드를 다시 분류한다(DESIGN.md §4.5). 화면은 기다리지 않는다.
@@ -95,6 +99,39 @@ async function SignedIn() {
           </ul>
         </section>
       )}
+      <section aria-label="정리 제안" className="flex flex-col gap-2 rounded-lg border border-black/15 p-4 text-sm dark:border-white/20">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold">정리 제안 {treeProposals.length > 0 ? treeProposals.length : ""}</h2>
+          <form action={requestTreeProposals}>
+            <GenerateProposalsButton />
+          </form>
+        </div>
+        {treeProposals.length === 0 ? (
+          <p className="text-zinc-500">제안이 없습니다. 하위 개념이 쌓인 뒤 &quot;정리 제안 받기&quot;를 누르면 Claude가 병합·분리를 제안합니다. 승인하기 전에는 아무것도 바뀌지 않습니다.</p>
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {treeProposals.map((p) => (
+              <li key={p.id} className="flex flex-col gap-2">
+                <p>
+                  <span className="mr-2 rounded-full border border-sky-500 px-2 py-0.5 text-xs text-sky-700 dark:text-sky-400">{p.kind === "merge" ? "병합" : "분리"}</span>
+                  {describeProposal(p)}
+                </p>
+                <span className="flex gap-2">
+                  <form action={approveTreeProposal}>
+                    <input type="hidden" name="proposal_id" value={p.id} />
+                    <input type="hidden" name="kind" value={p.kind} />
+                    <button type="submit" className="rounded-full bg-black px-4 py-1 text-xs font-medium text-white dark:bg-white dark:text-black">승인</button>
+                  </form>
+                  <form action={rejectTreeProposal}>
+                    <input type="hidden" name="proposal_id" value={p.id} />
+                    <button type="submit" className="rounded-full border border-black/15 px-4 py-1 text-xs font-medium dark:border-white/20">거절</button>
+                  </form>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
       <ConceptTree tree={tree} deleteCard={deleteCard} approveSub={approveSub} rejectSub={rejectSub} />
     </section>
   );
