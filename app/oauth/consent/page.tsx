@@ -73,13 +73,13 @@ async function Consent({ searchParams }: { searchParams: SearchParams }) {
       <div className="flex gap-3">
         <form action={approve}>
           <input type="hidden" name="authorization_id" value={id} />
-          <button type="submit" disabled={!owner} className="rounded-xl bg-brand hover:brightness-110 px-5 py-2 text-sm font-medium text-on-accent disabled:opacity-40">
+          <button type="submit" disabled={!owner} className="rounded-xl bg-brand px-5 py-2 text-sm font-medium text-on-accent disabled:opacity-40">
             승인
           </button>
         </form>
         <form action={deny}>
           <input type="hidden" name="authorization_id" value={id} />
-          <button type="submit" className="rounded-xl border border-line hover:bg-surface-hover px-5 py-2 text-sm font-medium">
+          <button type="submit" className="rounded-xl border border-line-strong hover:bg-surface-hover px-5 py-2 text-sm font-medium">
             거절
           </button>
         </form>
