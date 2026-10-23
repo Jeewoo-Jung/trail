@@ -26,12 +26,15 @@ export const CLASSIFY_TOOL = {
   },
 };
 
+/** 자료 칸 안의 글이 칸을 닫는 태그(</card> 등)를 흉내 내지 못하게 `<`를 글자 코드로 바꾼다. */
+const escapeData = (json: string): string => json.replace(/</g, "\\u003c");
+
 export function buildUserContent(input: Parameters<Classifier>[0]): string {
   const { card, topConcepts, approvedSubConcepts } = input;
   return [
-    `<top_concepts>\n${topConcepts.join("\n")}\n</top_concepts>`,
-    `<approved_sub_concepts>\n${approvedSubConcepts.map((s) => JSON.stringify({ top: s.top, sub: s.name })).join("\n")}\n</approved_sub_concepts>`,
-    `<card>\n${JSON.stringify({ title: card.title, summary: card.summary, keywords: card.keywords, evidence: card.evidence, candidates: card.candidates })}\n</card>`,
+    `<top_concepts>\n${topConcepts.map((name) => escapeData(JSON.stringify(name))).join("\n")}\n</top_concepts>`,
+    `<approved_sub_concepts>\n${approvedSubConcepts.map((s) => escapeData(JSON.stringify({ top: s.top, sub: s.name }))).join("\n")}\n</approved_sub_concepts>`,
+    `<card>\n${escapeData(JSON.stringify({ title: card.title, summary: card.summary, keywords: card.keywords, evidence: card.evidence, candidates: card.candidates }))}\n</card>`,
   ].join("\n\n");
 }
 

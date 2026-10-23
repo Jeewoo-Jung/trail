@@ -94,7 +94,7 @@ async function SignedIn() {
           </ul>
         </section>
       )}
-      <ConceptTree tree={tree} deleteCard={deleteCard} />
+      <ConceptTree tree={tree} deleteCard={deleteCard} approveSub={approveSub} rejectSub={rejectSub} />
     </section>
   );
 }

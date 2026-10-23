@@ -32,11 +32,11 @@
 | 스타일 | Tailwind CSS 4 (`@tailwindcss/turbopack`) |
 | 검사 | ESLint 9 (`eslint-config-next`) |
 | 경로 별칭 | `@/*` → 프로젝트 루트 |
-| 저장소·로그인 | Supabase (Postgres + Auth + OAuth 2.1 서버) — **아직 연결 전** |
-| AI | Claude API, 기본 모델 `claude-haiku-5-5` — **아직 연결 전** |
+| 저장소·로그인 | Supabase (Postgres + Auth + OAuth 2.1 서버) — 연결·적용 완료 |
+| AI | Claude API, 기본 모델 `claude-haiku-5-5` — 연결 완료(분류 보정) |
 | 배포 | Vercel |
 
-**지금은 기본 설치 직후 상태다.** `app/page.tsx`는 Next.js 기본 화면이고, Supabase·Claude SDK·검증 라이브러리·테스트 도구는 아직 설치하지 않았다. 필요한 개발 단위에서 그때 추가한다.
+**현재 상태는 PLAN.md의 체크박스가 기준이다.** Supabase·Claude SDK·zod·vitest·MCP 라이브러리는 설치돼 있고, `/`는 가상 샘플 화면, `/my`는 로그인 후 개념 트리다. 아직 없는 것은 배포(PLAN 7)와 커넥터 등록(PLAN 13) 같은 PLAN의 미체크 항목이다.
 
 ### Next.js 설정에서 조심할 것
 
@@ -133,6 +133,7 @@ trash-can/      지울 파일을 옮겨 두는 곳 (git 제외, 내가 직접 �
 - Claude 대화 자체를 고치거나 지우는 기능
 - 카드 내용 수정 (삭제만 가능)
 - 자연어 질의, 타임라인·프로젝트별 이력 뷰, 포트폴리오 뷰 (나중에)
+- 마인드맵 뷰는 should(시간이 되면)다. must 단계에서는 화면으로 만들지 않는다.
 
 ## 12. 알려진 확인 필요·정리할 것
 
