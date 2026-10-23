@@ -14,7 +14,7 @@ export function extractRules(markdown: string): string | null {
   return body === "" ? null : body;
 }
 
-export const RULES_NOTE = "※ 프로젝트 주제 목록은 이 도구가 아니라 사용자 지침에 적힌 목록을 따릅니다.";
+export const RULES_NOTE = "※ 프로젝트 주제 목록은 이 도구가 아니라 `list_cards`가 돌려주는 `projectTopics`를 따릅니다.";
 
 export async function loadRecordRules(): Promise<string | null> {
   const file = path.join(process.cwd(), "instructions", "trail-record-rules.md");

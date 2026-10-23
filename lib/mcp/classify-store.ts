@@ -16,8 +16,8 @@ export interface ClassifyStore {
   /** 승인·제안·거절을 모두 돌려준다(거절한 이름을 다시 제안하지 않기 위해). */
   listSubConcepts(): Promise<SubConceptRef[]>;
   getCard(id: string): Promise<CardForClassification | null>;
-  /** 분류 상태가 pending(분류 중)인 카드 id를 오래된 것부터 limit개. */
-  listPendingCardIds(limit: number): Promise<string[]>;
+  /** 분류 상태가 pending(분류 중)인 카드 id를 오래된 것부터 limit개. olderThanMs를 주면 그보다 오래 "분류 중"에 머문 카드만(작업이 중간에 끊겨 남은 카드를 찾을 때). */
+  listPendingCardIds(limit: number, olderThanMs?: number): Promise<string[]>;
   /** 분류 상태가 waiting인 카드 id를 오래된 것부터 limit개. */
   listWaitingCardIds(limit: number): Promise<string[]>;
   /** 같은 상위 개념 아래 같은 이름이 이미 있으면 그 id를 돌려준다. */

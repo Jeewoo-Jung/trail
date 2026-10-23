@@ -263,7 +263,7 @@
 - 입력: 대화 키(없으면 앱이 새로 발급), 이번 대화에서 확인 질문을 한 횟수, 항상 제외로 고른 주제(있으면, `always_excluded`에 저장됨), 카드 묶음(제목, 요약, 개념어, 근거 발췌, 분류 후보, 주제 키(Claude가 주제마다 붙이는 짧은 이름), 갱신할 카드 id는 선택, 프로젝트 주제는 선택)
 - 출력: 대화 키, 카드별 결과(`created`/`updated`/`rejected`+이유/`excluded`), 현재 제외 주제 목록
 
-**③ `get_record_rules`** (should, PLAN 22) — 입력 없음. `instructions/trail-record-rules.md`의 붙여 넣기 구간(최신 기록 규칙)을 그대로 돌려준다. 프로젝트 주제 목록은 돌려주지 않는다(사용자 지침에만 둔다).
+**③ `get_record_rules`** (should, PLAN 22) — 입력 없음. `instructions/trail-record-rules.md`의 붙여 넣기 구간(최신 기록 규칙)을 그대로 돌려준다. 프로젝트 주제 목록은 돌려주지 않는다(`list_cards`의 `projectTopics`가 알려 준다).
 
 - PRD의 도구 2개를 그대로 지킨다. 다만 PRD에는 없던 구체화가 두 가지 있다(11번 확인 필요): ① "이 주제는 항상 제외"를 저장하려고 `record_cards`에 제외 주제 칸을 둔다. ② Claude가 후보를 고를 수 있도록 `list_cards`가 개념 목록과 제외 주제를 함께 돌려준다.
 - 도구 입력은 zod로 검사한다. Claude에게 돌려주는 글에는 카드의 id·주제 키·제목 외에 요약과 근거를 다시 싣지 않는다.

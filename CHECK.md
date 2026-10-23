@@ -1,11 +1,11 @@
 # CHECK — Trail 구현 점검 결과 (2026-10-23)
 
-## 판정: **실패** (배포 전에 고칠 것이 남아 있음)
+## 판정: **조건부 통과** (우선순위 1은 고침, 우선순위 2·3과 배포 단계 항목이 남아 있음)
 
 - 기능 구현은 PLAN 기준으로 끝났고(테스트 264개 통과, 실제 DB 연동 시험 26개 통과), 설계와의 차이는 대부분 낮은 것이다.
-- 다만 **공개 전에 반드시 막아야 할 보안 항목 1건(높음)과, 기능이 설계와 어긋나 실제로 잘못 동작하는 항목 4건(중간)** 이 남아 있어 "통과"로 볼 수 없다.
-- 판정 기준: 높음 항목이 하나라도 남아 있으면 실패, 모두 고치면 통과.
-- 이 문서는 목록만 담는다. 아직 아무것도 고치지 않았다.
+- 처음 점검(2026-10-23)에서는 높음 1건과 중간 4건이 있어 **실패**였다. 우선순위 1(1~5번)을 모두 고쳐 높음 항목은 0건이 됐다.
+- 판정 기준: 높음 항목이 하나라도 남아 있으면 실패, 없으면 통과. 지금은 높음이 없으므로 통과 기준은 넘었지만, 중간 항목(6·7번)과 배포 단계 항목이 남아 있어 "조건부"로 적었다.
+- 우선순위 2·3은 아직 고치지 않았다.
 
 점검 방법: ① `bkit:gap-detector`가 DESIGN.md와 코드를 비교 ② `bkit:security-architect` 두 번(1차 인증·데이터 경로, 2차 공개 전 4가지 관점) ③ 로컬 실행·테스트·DB 시험. 에이전트가 말한 것 중 코드로 직접 확인한 것은 "확인"으로, 못 한 것은 "확인 필요"로 적었다.
 
@@ -13,15 +13,15 @@
 
 ## 1. 고쳐야 할 항목 (우선순위 순)
 
-### 우선순위 1 — 공개 전 필수
+### 우선순위 1 — 공개 전 필수 (모두 고침, 2026-10-23)
 
 | # | 심각도 | 항목 | 위치 | 고치는 방법 |
 |---|---|---|---|---|
-| 1 | 높음 | **승인 화면을 다른 사이트에 몰래 넣어 누르게 할 수 있다(클릭재킹).** 보안 헤더가 하나도 없고(확인), 동적 클라이언트 등록이 켜져 있어 누구나 앱을 등록할 수 있다. 로그인 쿠키가 SameSite=Lax라 실제로는 막힐 가능성이 크지만(확인 필요), 방어가 헤더 한 줄이라 반드시 넣는다. | `next.config.ts`(headers 없음), `app/oauth/consent/page.tsx` | 모든 경로에 `Content-Security-Policy: frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`를 넣는다. 배포 후 HSTS도 확인. |
-| 2 | 중간 | **`.vercelignore`가 없다.** CLI로 배포하면 `private-imports/`(내 대화 원본), `.env*`가 업로드될 수 있는지 확인하지 못했다(Vercel이 `.gitignore`를 따르는지 근거 못 찾음). | 프로젝트 루트 | `.vercelignore`에 `private-imports/`, `.env*`, `trash-can/`, `prototype-v1.html`을 넣거나, git 연결 배포만 쓴다. |
-| 3 | 중간 | **비밀값 가리기에 빠진 모양이 있다.** `sk-`, `ghp_`, `sbp_`, `vcp_`, `eyJ…`, `Bearer`만 가린다(확인). `sb_secret_`, `github_pat_`, `gho_/ghs_`, `AKIA…`, `AIza…`, `password=…` 형태는 그대로 저장·전송된다. 그런데 대화 추천 화면은 "키·비밀번호처럼 보이는 글자는 이미 가려 두었습니다"라고 안내한다(확인) — 사실과 다르다. | `lib/rules/mask-secrets.ts:13-25`, `components/import-flow.tsx:84` | 패턴과 테스트를 추가하고, 안내 문구를 "일부 형태만 가렸으니 직접 확인하세요"로 바꾼다. |
-| 4 | 중간 | **`get_record_rules`가 옛 규칙을 알려 준다.** 끝에 "프로젝트 주제 목록은 사용자 지침에 적힌 목록을 따릅니다"를 붙이는데(확인), 지금은 `list_cards`의 `projectTopics`가 맞다. Claude가 주제 목록을 엉뚱한 곳에서 찾게 된다. DESIGN.md §6.1 ③에도 같은 옛 문장이 있다. | `lib/mcp/record-rules.ts:17`, `DESIGN.md:266` | 문구를 "`list_cards`의 `projectTopics`를 따른다"로 고치고 테스트도 맞춘다. |
-| 5 | 중간 | **분류에서 카드가 "분류 중"으로 영영 남는다.** 한 장이 실패하면 반복이 끝나서 나머지가 `pending`에 남고(확인), `/my`는 `waiting`만 다시 분류한다. 또 규칙에 안 맞는 이상한 출력도 한도 오류와 똑같이 `waiting`이 되어, 가장 오래된 카드가 계속 이상한 값을 받으면 뒤의 대기 카드들이 다시 분류되지 않고 화면을 열 때마다 비용만 나갈 수 있다. | `lib/mcp/classify-card.ts:29,46,58`, `app/my/page.tsx:47` | 오래 남은 `pending`도 `/my`에서 다시 분류한다. 이상한 출력이 반복되는 카드는 건너뛰고 다음 카드로 넘어가게 한다. |
+| 1 | 높음 | **승인 화면을 다른 사이트에 몰래 넣어 누르게 할 수 있다(클릭재킹).** 보안 헤더가 하나도 없고(확인), 동적 클라이언트 등록이 켜져 있어 누구나 앱을 등록할 수 있다. 로그인 쿠키가 SameSite=Lax라 실제로는 막힐 가능성이 크지만(확인 필요), 방어가 헤더 한 줄이라 반드시 넣는다. | `next.config.ts`(headers 없음), `app/oauth/consent/page.tsx` | 모든 경로에 `Content-Security-Policy: frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`를 넣는다. 배포 후 HSTS도 확인. | **→ ✅ 고침: `next.config.ts`에 `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `HSTS`를 모든 경로에 추가. 실행 중인 서버에서 5개 경로의 응답 헤더를 직접 확인.**
+| 2 | 중간 | **`.vercelignore`가 없다.** CLI로 배포하면 `private-imports/`(내 대화 원본), `.env*`가 업로드될 수 있는지 확인하지 못했다(Vercel이 `.gitignore`를 따르는지 근거 못 찾음). | 프로젝트 루트 | `.vercelignore`에 `private-imports/`, `.env*`, `trash-can/`, `prototype-v1.html`을 넣거나, git 연결 배포만 쓴다. | **→ ✅ 고침: `.vercelignore` 추가(`private-imports/`, `trash-can/`, `.env*`(견본 제외), `prototype-v1.html`, `.bkit/`, `.claude/`). CLI 배포 때 실제로 제외되는지는 배포 때 확인.**
+| 3 | 중간 | **비밀값 가리기에 빠진 모양이 있다.** `sk-`, `ghp_`, `sbp_`, `vcp_`, `eyJ…`, `Bearer`만 가린다(확인). `sb_secret_`, `github_pat_`, `gho_/ghs_`, `AKIA…`, `AIza…`, `password=…` 형태는 그대로 저장·전송된다. 그런데 대화 추천 화면은 "키·비밀번호처럼 보이는 글자는 이미 가려 두었습니다"라고 안내한다(확인) — 사실과 다르다. | `lib/rules/mask-secrets.ts:13-25`, `components/import-flow.tsx:84` | 패턴과 테스트를 추가하고, 안내 문구를 "일부 형태만 가렸으니 직접 확인하세요"로 바꾼다. | **→ ✅ 고침: `sb_secret_`, `github_pat_`, `gho_/ghs_/ghu_/ghr_`, `AKIA/ASIA`, `AIza`, `xox*`, `password=값`류를 추가하고 안내 문구를 "모든 모양을 잡지는 못한다"로 정정. 테스트 추가, 일부러 패턴을 깨서 테스트가 잡는 것도 확인.**
+| 4 | 중간 | **`get_record_rules`가 옛 규칙을 알려 준다.** 끝에 "프로젝트 주제 목록은 사용자 지침에 적힌 목록을 따릅니다"를 붙이는데(확인), 지금은 `list_cards`의 `projectTopics`가 맞다. Claude가 주제 목록을 엉뚱한 곳에서 찾게 된다. DESIGN.md §6.1 ③에도 같은 옛 문장이 있다. | `lib/mcp/record-rules.ts:17`, `DESIGN.md:266` | 문구를 "`list_cards`의 `projectTopics`를 따른다"로 고치고 테스트도 맞춘다. | **→ ✅ 고침: 문구를 `list_cards`의 `projectTopics`로 바꾸고 DESIGN.md §6.1 ③도 맞춤. 테스트 추가.**
+| 5 | 중간 | **분류에서 카드가 "분류 중"으로 영영 남는다.** 한 장이 실패하면 반복이 끝나서 나머지가 `pending`에 남고(확인), `/my`는 `waiting`만 다시 분류한다. 또 규칙에 안 맞는 이상한 출력도 한도 오류와 똑같이 `waiting`이 되어, 가장 오래된 카드가 계속 이상한 값을 받으면 뒤의 대기 카드들이 다시 분류되지 않고 화면을 열 때마다 비용만 나갈 수 있다. | `lib/mcp/classify-card.ts:29,46,58`, `app/my/page.tsx:47` | 오래 남은 `pending`도 `/my`에서 다시 분류한다. 이상한 출력이 반복되는 카드는 건너뛰고 다음 카드로 넘어가게 한다. | **→ ✅ 고침: 규칙에 안 맞는 출력은 "미분류"로 확정(대기로 두지 않음), 호출이 실패하면 처리 못 한 나머지도 "대기"로 돌려 다시 분류되게 함, `/my`를 열 때 2분 넘게 "분류 중"에 머문 카드도 다시 분류. 테스트 추가.**
 
 ### 우선순위 2 — 공개 후 곧바로 (또는 배포와 함께)
 

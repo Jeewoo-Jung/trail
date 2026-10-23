@@ -174,3 +174,36 @@ describe("카드 전체 가리기", () => {
     expect(card.notes).toEqual([]);
   });
 });
+
+// 가짜 키는 실행할 때 조립해서, 소스에 키 모양 글자가 그대로 남지 않게 한다.
+describe("maskSecrets: 추가한 모양", () => {
+  const rnd = "aB3dE5fG7hJ9kL2mN4pQ6rS8tU1vW";
+  const cases: [string, string][] = [
+    ["sb_secret_", "sb_secret_" + rnd],
+    ["github_pat_", "github_pat_" + "11ABCDEFG0" + rnd],
+    ["gho_", "gho_" + rnd],
+    ["ghs_", "ghs_" + rnd],
+    ["AKIA", "AKIA" + "IOSFODNN7EXAMPL3"],
+    ["AIza", "AIza" + "SyA1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q"],
+    ["xoxb-", "xoxb-" + "123456789012-abcdefghijkl"],
+  ];
+  it.each(cases)("%s 모양을 가린다", (_name, secret) => {
+    const r = maskSecrets(`키는 ${secret} 입니다`);
+    expect(r.text).toBe("키는 ●●● 입니다");
+    expect(r.count).toBe(1);
+  });
+  it("password=값, api_key: 값은 이름을 남기고 값만 가린다", () => {
+    expect(maskSecrets("password=hunter2hunter2").text).toBe("password=●●●");
+    expect(maskSecrets('api_key: "ab12cd34ef56"').text).toBe('api_key: "●●●"');
+    expect(maskSecrets("TOKEN = ZZ9988776655").text).toBe("TOKEN = ●●●");
+  });
+  it("설명 글은 가리지 않는다 (값에 숫자가 없거나 8자 미만, 한글 값)", () => {
+    for (const ok of ["password: 변경하기로 했다", "token: abcdefghij", "secret=short1", "토큰 한도: 100000 tokens", "the password policy requires length"]) {
+      expect(maskSecrets(ok).text).toBe(ok);
+    }
+  });
+  it("같은 글에 다시 적용해도 결과가 같다", () => {
+    const once = maskSecrets(`password=hunter2hunter2 ${"gho_" + rnd}`).text;
+    expect(maskSecrets(once).text).toBe(once);
+  });
+});

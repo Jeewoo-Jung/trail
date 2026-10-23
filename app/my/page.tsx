@@ -6,7 +6,7 @@ import { createClaudeClassifier } from "@/lib/claude/classifier";
 import { ConceptTree } from "@/components/concept-tree";
 import { RealtimeStatus } from "@/components/realtime-status";
 import { loadTree } from "@/lib/my/load-tree";
-import { reclassifyWaiting } from "@/lib/mcp/classify-card";
+import { classifyPendingThenWaiting } from "@/lib/mcp/classify-card";
 import { createSupabaseClassifyStore } from "@/lib/mcp/supabase-classify-store";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -28,6 +28,9 @@ export default function MyPage() {
   );
 }
 
+// 기록 직후 분류가 중간에 끊겨 이만큼 오래 "분류 중"으로 남은 카드는 화면을 열 때 다시 분류한다.
+const STALE_PENDING_MS = 2 * 60_000;
+
 // 화면에서도 로그인을 다시 확인한다. proxy.ts는 빠른 확인일 뿐이다.
 async function SignedIn() {
   const user = await getCurrentUser();
@@ -44,7 +47,7 @@ async function SignedIn() {
   if (apiKey) {
     after(async () => {
       try {
-        await reclassifyWaiting(createSupabaseClassifyStore(supabase), createClaudeClassifier(apiKey));
+        await classifyPendingThenWaiting(createSupabaseClassifyStore(supabase), createClaudeClassifier(apiKey), { olderThanMs: STALE_PENDING_MS });
       } catch {
         console.error("[my] 대기 카드 다시 분류 실패");
       }
