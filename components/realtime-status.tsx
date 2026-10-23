@@ -21,8 +21,10 @@ export function RealtimeStatus() {
     let wasConnected = false;
     const channel = supabase
       .channel("trail-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "cards" }, refreshSoon)
-      .on("postgres_changes", { event: "*", schema: "public", table: "concepts" }, refreshSoon)
+      .on("postgres_changes", { event: "*", schema: "public", table: "nodes" }, refreshSoon)
+      .on("postgres_changes", { event: "*", schema: "public", table: "node_fields" }, refreshSoon)
+      .on("postgres_changes", { event: "*", schema: "public", table: "field_suggestions" }, refreshSoon)
+      .on("postgres_changes", { event: "*", schema: "public", table: "outputs" }, refreshSoon)
       .subscribe((status) => {
         const ok = status === "SUBSCRIBED";
         setConnected(ok);

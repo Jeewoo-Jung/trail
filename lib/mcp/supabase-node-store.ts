@@ -4,7 +4,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Evidence, NodeKind, NodeLockable, PortfolioStatus, StarField, Subject } from "../rules/nodes";
 import type { ConversationInfo, NodeStore, StoredField, StoredNode } from "./node-store";
-import { StoreError } from "./store";
+import { StoreError } from "./errors";
 
 type DbError = { code?: string } | null;
 function check(error: DbError, what: string): void {

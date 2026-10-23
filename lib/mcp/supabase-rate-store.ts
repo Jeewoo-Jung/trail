@@ -2,7 +2,7 @@
 // 읽고 쓰는 사이에 동시 호출이 겹치면 한두 번 덜 셀 수 있으나, 혼자 쓰는 앱이라 받아들인다.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RateStore } from "./rate-guard";
-import { StoreError } from "./store";
+import { StoreError } from "./errors";
 
 export function createSupabaseRateStore(client: SupabaseClient): RateStore {
   return {

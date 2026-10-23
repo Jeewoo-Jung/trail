@@ -2,7 +2,7 @@
 //   모양·한도 검사 → 비밀값 가리기 → 새 활동 만들기 또는 기존 활동 찾기 → 항목별 병합(잠긴 항목은 제안으로)
 // 결과에는 id·상태·항목별 처리 결과만 담고 내용은 돌려주지 않는다. 일부 항목이 거절돼도 나머지는 저장된다.
 import { z } from "zod";
-import { countChars } from "../rules/card";
+import { countChars } from "../rules/text";
 import { NODE_LIMITS } from "../rules/limits";
 import { maskSecrets } from "../rules/mask-secrets";
 import { checkAddNode, checkField, checkNodeInput, hasStar, mergeField, STAR_FIELD_LABEL, SUBJECTS, type Evidence, type NodeKind, type StarField } from "../rules/nodes";

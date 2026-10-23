@@ -2,7 +2,7 @@
 //  - 값 검사(이름·기간·STAR 항목·근거), 노드 종류별 부모 규칙, 이동 검사
 //  - 병합 규칙: 잠긴 필드는 건드리지 않고 제안으로, 잠기지 않은 필드는 덧붙이기만 한다
 //  - 제외(조상까지 보는 실질 제외)와 문서에 넣을 노드 고르기
-import { countChars } from "./card";
+import { countChars } from "./text";
 import { EVIDENCE_LIMITS, NODE_LIMITS, STAR_LIMITS } from "./limits";
 
 export const NODE_KINDS = ["category", "project", "activity", "subactivity", "study"] as const;

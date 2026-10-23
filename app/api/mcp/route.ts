@@ -11,7 +11,7 @@ import { guardRequest } from "@/lib/mcp/rate-guard";
 import { recordActivities } from "@/lib/mcp/record-activities";
 import { createSupabaseRateStore } from "@/lib/mcp/supabase-rate-store";
 import { createSupabaseNodeStore } from "@/lib/mcp/supabase-node-store";
-import { StoreError } from "@/lib/mcp/store";
+import { StoreError } from "@/lib/mcp/errors";
 import { supabaseEnv } from "@/lib/supabase/env";
 
 /** 로그인한 사람의 토큰을 그대로 실어 보내는 연결: 데이터 접근에 "내 행만" 규칙(RLS)이 걸린다. */
