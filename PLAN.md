@@ -55,7 +55,7 @@
 - [x] 4. 키·토큰 모양 문자열을 저장 전에 자동으로 가리는 기능과 테스트를 만든다. [PRD 9-3]
 - [x] 5. Supabase에 카드·상위 개념·하위 개념·설정 데이터 구조를 만들고 "내 행만" 접근하는 규칙(RLS)을 건다. [PRD 9-4]
 - [x] 6. Supabase 이메일 로그인을 붙이고 신규 가입을 막아 내 계정 하나만 허용한다. [PRD 9-5]
-- [ ] 7. 지금 상태를 Vercel에 배포해 공개 주소를 정하고, 환경변수와 Supabase 로그인 주소를 설정한다. [PRD 9-6]
+- [ ] 7. 지금 상태를 Vercel에 배포해 공개 주소를 정하고, 환경변수와 Supabase 로그인 주소를 설정한다. [PRD 9-6] → 2026-10-23 Vercel 배포 완료(https://trail-pink-zeta.vercel.app), 환경변수 4개 등록, 공개 저장소 https://github.com/Jeewoo-Jung/trail. 남은 것: Supabase Site URL을 배포 주소로 바꾸기(승인 대기).
 
 ### B. 카드 받기 (must 1)
 
