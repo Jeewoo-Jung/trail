@@ -1,6 +1,6 @@
 "use client";
 
-// Design Ref: DESIGN.md §12 (Glass Iris) — 왼쪽 얇은 아이콘 레일 + 위쪽 바(이동 경로, 실시간 상태 알약, 내 메뉴) + 가운데 본문.
+// Design Ref: DESIGN.md §13 — 왼쪽 얇은 아이콘 레일 + 위쪽 바(이동 경로, 실시간 상태 알약, 내 메뉴) + 가운데 본문.
 // 좁은 화면에서는 레일이 위쪽 바 아래의 가로 아이콘 줄이 되고, 위쪽 바는 두 줄로 나뉜다.
 import Link from "next/link";
 import { usePathname } from "next/navigation";

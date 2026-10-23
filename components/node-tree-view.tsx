@@ -69,7 +69,7 @@ export function NodeTreeView({ data, actions, aiEnabled = false, result }: { dat
         </nav>
         <section aria-label="상세" className="min-w-0">
           {node ? (
-            <NodeDetail tree={tree} data={data} node={node} actions={actions} onSelect={setSelected} userId={result?.userId} nowIso={result?.nowIso} />
+            <NodeDetail key={node.id} tree={tree} data={data} node={node} actions={actions} onSelect={setSelected} userId={result?.userId} nowIso={result?.nowIso} />
           ) : (
             <EmptyState title={total === 0 ? "아직 기록이 없습니다" : "노드를 골라 보세요"}>
               {total === 0 ? "Claude와 대화하다 기록하면 프로젝트와 활동이 자동으로 만들어져 여기에 나타납니다. 왼쪽 아래에서 직접 추가할 수도 있어요." : "왼쪽에서 프로젝트나 활동을 고르면 STAR 내용과 근거를 보고 바로 고칠 수 있습니다."}

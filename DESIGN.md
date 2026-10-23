@@ -3,7 +3,7 @@
 - 기준 문서: [PRD.md](PRD.md), [PLAN.md](PLAN.md)
 - 작성자: 정지우
 - 작성일: 2026-10-23
-- 상태: 사이클 1 설계(§1~13)는 구현 완료. **사이클 2(노드·활동 카드 개편)의 설계는 §14**이며, 겹치는 부분은 §14가 우선한다.
+- 상태: 사이클 1 설계(§1~12)는 구현 완료(이력). **사이클 2(노드·활동 카드 개편)의 설계는 §14**이며, 겹치는 부분은 §14가 우선한다.
 
 > 이 문서는 **무엇이 어디에 보이는지(화면)**, **데이터가 어떻게 흘러가는지(데이터 흐름)**, **어떤 기술을 쓰는지(기술 선택)**를 정한다. 코드는 아직 없다. 용어가 낯설면 2번 표의 "쉬운 설명" 칸을 먼저 보면 된다.
 
@@ -420,7 +420,7 @@ trash-can/                          지울 파일 임시 보관 (git 제외)
 
 **세션 나누기 제안**: ① 바탕(1~7, 1-1 포함) ② 카드 받기(8~13, 12-1 포함) ③ 트리 보기(14~19) ④ 점검(20) ⑤ should(21~23). 한 번에 한 묶음씩 하고, 작업마다 검증 루프를 돈다.
 
-## 12. 시각 디자인 (애플 홈페이지 참고)
+## 13. 시각 디자인 (애플 홈페이지 참고)
 
 PLAN 29에서 정했다. 이전에 따뜻한 차콜(테라코타 포인트)이었던 것을 애플 홈페이지의 분위기로 바꿨다. 애플의 로고·서체 파일·이미지는 쓰지 않고 분위기만 참고한다.
 
@@ -441,26 +441,26 @@ PLAN 29에서 정했다. 이전에 따뜻한 차콜(테라코타 포인트)이�
 - **자동 생성 → 사용자 수정**: 앱·Claude가 먼저 만들고, 사용자가 모든 필드를 인라인으로 고친다. 고친 필드는 잠금이며 AI(기록 병합·묶기 제안)는 잠긴 필드를 바꾸지 않는다.
 - **근거 없으면 비움**: 근거(대화 제목·날짜 + 원문 발췌)가 없는 STAR 항목은 값을 저장하지 않는다.
 - **삭제와 제외는 다르다**: 삭제는 휴지통(복구 가능), 제외는 포트폴리오 상태다.
-- **키 없이도 동작**: Claude API 키가 없으면 AI 기능(묶기 제안·요약)만 비활성화한다. 기록 받기·편집·뷰·내려받기·결과 등록은 그대로다.
+- **키 없이도 동작**: Claude API 키가 없으면 AI 기능(묶기 제안)만 비활성화한다. 기록 받기·편집·뷰·내려받기·결과 등록은 그대로다.
 - 대화 속 내용은 내부 정보 여부를 가리지 않고 그대로 쓴다(공개 가능 여부 필드 없음). 실제 데이터·백업은 공개 저장소에 올리지 않는다.
 
-### 14.2 데이터 구조 (초안)
+### 14.2 데이터 구조 (확정, 32번 이후 보완 포함)
 
 | 표 | 역할 | 주요 열 |
 |---|---|---|
-| `nodes` | 모든 노드(범주·프로젝트·활동·세부활동·학습) | id, user_id, parent_id(자기 참조), kind, name(60자), description, start_date, end_date, portfolio_status(`candidate` 소재 후보 / `needs_work` 보완 필요 / `hold` 보류 / `excluded` 제외, 기본 `candidate`), locked_fields(잠긴 필드 이름 목록), result_state(`empty`/`snoozed`/`not_applicable`/`filled`), result_snooze_until, sort_order, created_by(`ai`/`user`), created_at, updated_at, **deleted_at(휴지통)** |
+| `nodes` | 모든 노드(범주·프로젝트·활동·세부활동·학습) | id, user_id, parent_id(자기 참조), kind, name(60자), description, start_date, end_date, portfolio_status(`candidate` 소재 후보 / `needs_work` 보완 필요 / `hold` 보류 / `excluded` 제외, 기본 `candidate`), locked_fields(잠긴 필드 이름 목록), result_state(`empty`/`snoozed`/`not_applicable`/`filled`), result_snooze_until, **result_asked_at(채팅에서 결과를 물은 시각)**, **cleared_fields(내가 비운 항목: AI가 다시 채우지 않음)**, sort_order, created_by(`ai`/`user`), created_at, updated_at, **deleted_at(휴지통)** |
 | `node_fields` | 활동·세부활동의 STAR 항목 | node_id, field(`situation`·`task`·`action`·`result_conversation`·`result_external`), text, **subject(주체: `did` 내가 한 일 / `plan` 내 계획 / `claude_unconfirmed` Claude 제안·채택 미확인 / `estimate` 추정)**, locked, updated_by, updated_at · (node_id, field) 중복 불가. 값이 없으면 행을 만들지 않는다(미입력). `result_external`은 내가 입력하고 기본 미입력 |
 | `evidence` | 항목별 근거 | id, node_id, field, conversation_title, conversation_date, excerpt(300자 이하), created_at |
 | `outputs` | 산출물 별도 목록(최종 산출물 포함) | id, node_id, name, url, storage_path(첨부 파일), is_final, created_at |
 | `field_suggestions` | 기존 활동에 새 기록이 들어올 때 필드별 제안 | id, node_id, field, text, subject, evidence(jsonb), status(`proposed`/`accepted`/`rejected`), source_conversation_key, created_at |
-| `group_proposals` | 상향식 묶기 제안 | id, level(묶는 노드들의 단계), child_node_ids, suggested_name, suggested_kind, status, created_at |
+| `group_proposals` | 상향식 묶기 제안 | id, child_node_ids, suggested_name, suggested_kind, **signature(같은 묶음 중복·거절 기억)**, status, created_at, resolved_at |
 | `conversations` | 대화 정보 | key, question_count(대화당 최대 3), 만든 날 |
 | `topic_questions` | 주제당 1회 질문 기록 | conversation_key, topic_key, asked_at · (conversation_key, topic_key) 중복 불가 |
-| `settings` | 설정 | result_wait_days(기본 7), result_snooze_days, (기존 값 유지: 프로젝트 주제 등은 33번에서 정리), 무조건 제외 목록은 비워 둠 |
+| `settings` | 설정 | result_wait_days(기본 7), result_snooze_days · 옛 `always_excluded`·`blocked`·`project_topics` 열은 배포 직후 마이그레이션에서 지운다(무조건 제외 목록은 만들지 않음) |
 
 - 모든 표에 RLS "내 행만". `evidence.excerpt`·STAR 글자 수 한도는 코드(`lib/rules/limits.ts`)에 숫자로 적고 테스트한다. **STAR 한도 초안**: 상황 300자, 과제 200자, 내가 한 일 500자, 결과(대화에서 얻은 것) 300자, 외부 결과 300자 — 32번에서 확정한다.
 - **제외의 효과**는 저장하지 않고 계산한다: 노드 자신이나 조상 중 하나라도 `excluded`이면 "실질 제외"다(자식만 개별 제외 가능). 문서 뷰·내려받기는 실질 제외와 휴지통(`deleted_at`)을 뺀다.
-- **깊이·개수 한도**는 이전과 같이 5단계·300개를 기본으로 하되 32번에서 확정한다.
+- **깊이·개수 한도**: 8단계·1000개(아래 "확정한 값").
 
 **32번에서 확정한 값 (`lib/rules/limits.ts`, 데이터베이스 check로도 같은 안전망)**
 - 노드: 이름 60자, 설명 500자, **8단계**(뿌리=1), 사용자당 **1000개**(휴지통 포함). 순환·9단계 이상은 DB 트리거가 막는다(`node_cycle`·`node_too_deep`, 개수는 `node_limit`).
@@ -479,6 +479,7 @@ PLAN 29에서 정했다. 이전에 따뜻한 차콜(테라코타 포인트)이�
 3. 잠기지 않았고 비어 있으면 값을 채운다(주체·근거 포함).
 4. 잠기지 않았고 이미 값이 있으면 **덧붙인다**(기존 내용은 지우지 않는다, 글자 수 한도를 넘으면 제안으로 돌린다).
 5. 근거가 없는 새 내용은 값으로 넣지 않고 버리거나 "추정" 제안으로만 둔다.
+6. **(점검 후 보강)** 덧붙이려는데 **주체가 기존과 다르거나** 새 근거를 붙일 자리(항목당 3개)가 없으면 덧붙이지 않고 제안으로 돌린다(항목 전체의 주체가 바뀌거나 근거 없는 글이 섞이는 것을 막는다). **내가 비워 둔 항목**(`cleared_fields`)은 AI가 다시 채우지 않고 제안으로만 쌓는다. 이미 외부 결과가 있으면 채팅(`record_result`)은 덮어쓰지 않고 제안으로 쌓는다.
 
 ### 14.4 기록 질문 흐름 (Claude 쪽 규칙, 33번)
 - 조건: 같은 주제에서 내 메시지 5개 이상 + 결정이나 산출물이 있음. 지식 습득성 질의는 제외.
@@ -507,7 +508,7 @@ PLAN 29에서 정했다. 이전에 따뜻한 차콜(테라코타 포인트)이�
 - **결과 등록 대기 배너**(37번): 대시보드 위쪽, 항목별 "나중에"·"해당 없음".
 - **프로젝트 STAR 문서 뷰**(38번, 최종 산출): 프로젝트 아래 활동 카드를 모아 문서처럼 보여 주고 제외·휴지통 항목은 자동으로 뺀다. 활동 단위·프로젝트 단위 Markdown/JSON 다운로드.
 - **마인드맵**은 보조 화면이다(기존 그래프 화면을 노드 모델에 맞춰 유지).
-- 시각 디자인은 §12(애플 홈페이지 참고)를 그대로 쓴다.
+- 시각 디자인은 §13(애플 홈페이지 참고)을 그대로 쓴다.
 
 **34번 구현 메모**
 - 화면: `/my`(내 기록) = 왼쪽 노드 트리(종류 라벨·상태·잠금·제안 수 표시, 접기/펼치기, 맨 위에 노드 추가) + 오른쪽 상세(이름·종류·상태·기간·설명 편집, 위치 옮기기, STAR 항목별 편집·주체·잠금·근거 편집·들어온 제안 처리, 외부 결과, 산출물, 하위 추가·합치기·쪼개기·휴지통) + 아래 휴지통(복구·완전히 지우기). 같은 컴포넌트(`NodeTreeView`)를 로그인 전 샘플(`/`)에서 `actions` 없이 쓰면 읽기 전용이 된다.
@@ -545,7 +546,7 @@ PLAN 29에서 정했다. 이전에 따뜻한 차콜(테라코타 포인트)이�
 
 | 기존 | 처리 방향 |
 |---|---|
-| `concepts`, `cards`의 분류 열, `tree_proposals` | `nodes`·`node_fields`·`group_proposals`로 대체. 초기화는 완료(2026-10-23, 백업은 로컬 `backups/`). 옛 표·함수는 32번 마이그레이션에서 정리 |
+| `concepts`, `cards`의 분류 열, `tree_proposals` | `nodes`·`node_fields`·`group_proposals`로 대체. 초기화는 완료(2026-10-23, 백업은 로컬 `backups/`). 옛 표·함수는 배포 직후 마이그레이션(`20261023200000_drop_old_model.sql`)에서 정리 |
 | Claude 분류기(`classifier`), 개념 승인·거절, 병합·분리 제안 | 폐기(자동 생성 + 사용자 수정 + 묶기 제안으로 대체). 코드는 `trash-can`으로 이동 |
 | 과거 대화 내보내기 추천(PLAN 21) | 새 모델에 맞게 재검토(보류) |
 | MCP 서버·OAuth·요청 제한·키 가리기·실시간 갱신·로그인·Vercel 배포 | 유지 |

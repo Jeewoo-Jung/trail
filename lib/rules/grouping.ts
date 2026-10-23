@@ -2,7 +2,8 @@
 // 이 파일은 순수 규칙만 둔다: 어떤 노드들이 후보인지, Claude의 답이 규칙에 맞는지, 승인해도 되는지.
 // 시드 범주가 없어도 동작한다(부모가 없는 맨 위 노드끼리도 묶는다). 승인한 것만 반영하고, 거절한 제안은 같은 묶음으로 다시 만들지 않는다.
 import { GROUP_LIMITS } from "./limits";
-import { canBeChild, checkNodeInput, isEffectivelyExcluded, type NodeKind, type NodeRef } from "./nodes";
+import { canBeChild, checkNodeInput, depthOf, isEffectivelyExcluded, subtreeHeight, type NodeKind, type NodeRef } from "./nodes";
+import { NODE_LIMITS } from "./limits";
 import { normalizeTopic } from "./topic";
 
 export type GroupableNode = NodeRef & { name: string; description: string };
@@ -78,5 +79,8 @@ export function checkApplyGroup(nodes: readonly GroupableNode[], childIds: reado
   if (kids.some((k) => k!.parentId !== first.parentId || k!.kind !== first.kind)) return { ok: false, message: "묶으려던 노드의 위치나 종류가 바뀌었습니다. 제안을 거절하고 새로 받아 주세요." };
   const parentKind = first.parentId ? (nodes.find((p) => p.id === first.parentId)?.kind ?? null) : null;
   if (!canBeChild(parentKind, kind) || !canBeChild(kind, first.kind)) return { ok: false, message: "이 위치에는 그 묶음을 만들 수 없습니다." };
+  // 새 상위 노드가 한 단계를 더하므로, 그 아래 가장 깊은 가지가 단계 한도를 넘지 않아야 한다
+  const tallest = Math.max(...kids.map((k) => subtreeHeight(nodes, k!.id)));
+  if (depthOf(nodes, first.parentId) + 1 + tallest > NODE_LIMITS.maxDepth) return { ok: false, message: `묶으면 ${NODE_LIMITS.maxDepth}단계를 넘는 가지가 생겨 만들 수 없습니다.` };
   return { ok: true, parentId: first.parentId };
 }

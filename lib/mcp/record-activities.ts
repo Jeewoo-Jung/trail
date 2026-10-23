@@ -3,7 +3,7 @@
 // 결과에는 id·상태·항목별 처리 결과만 담고 내용은 돌려주지 않는다. 일부 항목이 거절돼도 나머지는 저장된다.
 import { z } from "zod";
 import { countChars } from "../rules/text";
-import { NODE_LIMITS } from "../rules/limits";
+import { EVIDENCE_LIMITS, NODE_LIMITS } from "../rules/limits";
 import { maskSecrets } from "../rules/mask-secrets";
 import { checkAddNode, checkField, checkNodeInput, hasStar, isEffectivelyExcluded, mergeField, STAR_FIELD_LABEL, SUBJECTS, type Evidence, type NodeKind, type StarField } from "../rules/nodes";
 import { normalizeTopic } from "../rules/topic";
@@ -91,10 +91,10 @@ export async function recordActivities(store: NodeStore, rawInput: unknown): Pro
     }
   }
 
-  // 질문한 주제는 기록이 하나라도 저장됐을 때 남긴다(저장이 안 됐으면 같은 주제로 다시 물을 수 있게 둔다).
-  if (input.topicKey && saved && input.topicKey.trim() !== "") {
+  // 질문한 주제는 기록이 하나라도 저장됐을 때, 또는 "기록하지 않기"처럼 보낼 활동이 없을 때 남긴다(저장이 실패했으면 같은 주제로 다시 물을 수 있게 둔다).
+  if (input.topicKey && (saved || input.activities.length === 0) && input.topicKey.trim() !== "") {
     try {
-      await store.markTopicAsked(conversation.key, input.topicKey.trim().slice(0, 100));
+      await store.markTopicAsked(conversation.key, mask(input.topicKey).trim().slice(0, 100));
     } catch {
       /* 질문 기록 실패는 기록 자체를 막지 않는다 */
     }
@@ -152,7 +152,11 @@ async function recordOne(store: NodeStore, conversationKey: string, input: Activ
     if ("empty" in checked.value) continue;
     const value = checked.value;
     const stored = existing.get(field) ?? null;
-    const merged = mergeField(stored ? { text: stored.text, locked: stored.locked } : null, value.text, field);
+    let merged = mergeField(stored ? { text: stored.text, locked: stored.locked } : null, value.text, field);
+    // 내가 비워 둔 항목은 AI가 다시 채우지 않는다(제안으로만 쌓는다).
+    if (merged.action === "set" && node.clearedFields.includes(field)) merged = { action: "suggest" };
+    // 덧붙이려는데 주체가 다르거나(항목 전체의 주체가 바뀌게 된다) 새 근거를 붙일 자리가 없으면, 근거 없는 내용이 섞이지 않도록 제안으로 돌린다.
+    if (merged.action === "append" && (stored?.subject !== value.subject || (await store.countEvidence(node.id, field)) >= EVIDENCE_LIMITS.maxPerField)) merged = { action: "suggest" };
     if (merged.action === "skip") {
       outcomes[field] = "skipped";
     } else if (merged.action === "suggest") {
@@ -164,7 +168,7 @@ async function recordOne(store: NodeStore, conversationKey: string, input: Activ
       }
     } else {
       await store.upsertField(node.id, field, merged.text, value.subject);
-      const room = Math.max(0, 3 - (await store.countEvidence(node.id, field)));
+      const room = Math.max(0, EVIDENCE_LIMITS.maxPerField - (await store.countEvidence(node.id, field)));
       if (room > 0) await store.insertEvidence(node.id, field, value.evidence.slice(0, room));
       outcomes[field] = merged.action === "set" ? "set" : "appended";
     }
@@ -203,7 +207,10 @@ async function createActivity(store: NodeStore, nodes: StoredNode[], input: Acti
   let parentId: string | null = input.parentId ?? null;
   if (parentId === null && input.projectName && input.projectName.trim() !== "") {
     const projectName = mask(input.projectName);
-    const same = nodes.find((n) => n.kind === "project" && !n.deletedAt && n.parentId === null && normalizeTopic(n.name) === normalizeTopic(projectName));
+    // 같은 이름의 프로젝트는 어느 범주 아래에 있든 찾는다(묶기로 옮겨진 뒤에도 중복이 생기지 않게). 여러 개면 어디인지 알 수 없어 거절한다.
+    const sames = nodes.filter((n) => n.kind === "project" && !n.deletedAt && normalizeTopic(n.name) === normalizeTopic(projectName));
+    if (sames.length > 1) return { ok: false, message: "같은 이름의 프로젝트가 여러 개입니다. list_cards의 places에서 parentId를 골라 보내 주세요." };
+    const same = sames[0];
     if (same) {
       parentId = same.id;
     } else {
@@ -212,7 +219,7 @@ async function createActivity(store: NodeStore, nodes: StoredNode[], input: Acti
       const room = checkAddNode(nodes, null, "project");
       if (!room.ok) return { ok: false, message: room.message };
       const made = await store.insertNode({ parentId: null, kind: "project", name: project.value.name, description: "", startDate: null, endDate: null });
-      nodes.push({ id: made.id, parentId: null, kind: "project", portfolioStatus: "candidate", deletedAt: null, name: project.value.name, description: "", startDate: null, endDate: null, lockedFields: [], resultState: "empty", resultSnoozeUntil: null, resultAskedAt: null, updatedAt: "" });
+      nodes.push({ id: made.id, parentId: null, kind: "project", portfolioStatus: "candidate", deletedAt: null, name: project.value.name, description: "", startDate: null, endDate: null, lockedFields: [], clearedFields: [], resultState: "empty", resultSnoozeUntil: null, resultAskedAt: null, updatedAt: "" });
       parentId = made.id;
       notes.push("프로젝트를 새로 만들었습니다.");
     }
@@ -222,5 +229,5 @@ async function createActivity(store: NodeStore, nodes: StoredNode[], input: Acti
   if (!placed.ok) return { ok: false, message: placed.message };
   const v = checked.value;
   const { id } = await store.insertNode({ parentId, kind, name: v.name, description: v.description, startDate: v.startDate, endDate: v.endDate });
-  return { ok: true, notes, node: { id, parentId, kind, portfolioStatus: "candidate", deletedAt: null, name: v.name, description: v.description, startDate: v.startDate, endDate: v.endDate, lockedFields: [], resultState: "empty", resultSnoozeUntil: null, resultAskedAt: null, updatedAt: "" } };
+  return { ok: true, notes, node: { id, parentId, kind, portfolioStatus: "candidate", deletedAt: null, name: v.name, description: v.description, startDate: v.startDate, endDate: v.endDate, lockedFields: [], clearedFields: [], resultState: "empty", resultSnoozeUntil: null, resultAskedAt: null, updatedAt: "" } };
 }

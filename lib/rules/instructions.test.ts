@@ -40,6 +40,13 @@ describe("instructions/trail-record-rules.md", () => {
     expect(body).toContain(`**${STAR_LIMITS.result_external}자 이하**`);
     for (const action of ["save", "not_applicable", "asked"]) expect(body).toContain(`\`${action}\``);
   });
+  it("보강 규칙(기록하지 않기도 기록·주체가 다르면 제안·세부활동 kind)을 담고 있다", () => {
+    expect(body).toContain('"기록하지 않기"를 골라도 질문은 기록한다');
+    expect(body).toContain("`activities: []`");
+    expect(body).toContain("주체가 다르거나");
+    expect(body).toContain('`kind: "subactivity"`');
+    expect(body).toContain("세부활동 id는 받지 않는다");
+  });
   it("옛 방식(프로젝트 주제 자동 기록·항상 제외·분류 후보)을 더 이상 쓰지 않는다", () => {
     for (const old of ["projectTopics", "excludeTopics", "항상 제외", "candidates", "cardId", "미분류"]) expect(body).not.toContain(old);
   });

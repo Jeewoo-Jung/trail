@@ -17,7 +17,7 @@ export class FakeNodeStore implements NodeStore {
     if (this.failOn === where) throw new Error(`저장소 오류(${where}) 비밀 내용이 섞인 메시지`);
   }
   addNode(partial: Partial<StoredNode> & Pick<StoredNode, "kind" | "name">): StoredNode {
-    const node: StoredNode = { id: randomUUID(), parentId: null, portfolioStatus: "candidate", deletedAt: null, description: "", startDate: null, endDate: null, lockedFields: [], resultState: "empty", resultSnoozeUntil: null, resultAskedAt: null, updatedAt: String(this.tick += 1).padStart(6, "0"), ...partial };
+    const node: StoredNode = { id: randomUUID(), parentId: null, portfolioStatus: "candidate", deletedAt: null, description: "", startDate: null, endDate: null, lockedFields: [], clearedFields: [], resultState: "empty", resultSnoozeUntil: null, resultAskedAt: null, updatedAt: String(this.tick += 1).padStart(6, "0"), ...partial };
     this.nodes.push(node);
     return node;
   }
@@ -52,7 +52,12 @@ export class FakeNodeStore implements NodeStore {
   }
 
   async listFields(nodeId: string): Promise<StoredField[]> {
-    return [...(this.fields.get(nodeId) ?? new Map()).entries()].map(([field, v]) => ({ field, text: v.text, locked: v.locked }));
+    return [...(this.fields.get(nodeId) ?? new Map()).entries()].map(([field, v]) => ({ field, text: v.text, locked: v.locked, subject: v.subject }));
+  }
+  async listFieldsMany(nodeIds: readonly string[]) {
+    const out = new Map<string, StoredField[]>();
+    for (const id of nodeIds) out.set(id, await this.listFields(id));
+    return out;
   }
   async upsertField(nodeId: string, field: StarField, text: string, subject: Subject) {
     this.boom("upsertField");
@@ -66,7 +71,7 @@ export class FakeNodeStore implements NodeStore {
     this.evidence.set(k, [...(this.evidence.get(k) ?? []), ...evidence]);
   }
   async listOpenSuggestions(nodeId: string) { return this.suggestions.filter((s) => s.nodeId === nodeId).map((s) => ({ field: s.field, text: s.text })); }
-  async insertSuggestion(s: { nodeId: string; field: StarField; text: string; subject: Subject; evidence: readonly Evidence[]; conversationKey: string }) { this.suggestions.push(s); }
+  async insertSuggestion(s: { nodeId: string; field: StarField; text: string; subject: Subject; evidence: readonly Evidence[]; conversationKey: string | null }) { this.suggestions.push({ ...s, conversationKey: s.conversationKey ?? "" }); }
   async listOutputs(nodeId: string) { return [...(this.outputs.get(nodeId) ?? [])]; }
   finals = new Set<string>();
   asked = new Set<string>();
@@ -82,7 +87,7 @@ export class FakeNodeStore implements NodeStore {
   async setResultText(nodeId: string, text: string) {
     this.boom("setResultText");
     const m = this.fields.get(nodeId) ?? new Map();
-    m.set("result_external", { text, subject: "did", locked: true, updatedBy: "user" });
+    m.set("result_external", { text, subject: "did", locked: false, updatedBy: "ai" });
     this.fields.set(nodeId, m);
   }
   async markResultAsked(nodeId: string) { this.asked.add(nodeId); const n = this.nodes.find((x) => x.id === nodeId); if (n) n.resultAskedAt = "2026-10-30T00:00:00Z"; }

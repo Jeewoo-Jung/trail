@@ -76,7 +76,7 @@ npm run test:integration   # 실제 Supabase에 로그인해서 도는 시험(�
 - [PRD.md](PRD.md) — 기획서(문제, 목표, 기능, 범위, 보안)
 - [PLAN.md](PLAN.md) — 구현 계획과 진행 체크
 - [DESIGN.md](DESIGN.md) — 설계(화면, 데이터 흐름, 도구, 보안, 시각 디자인)
-- [CHECK.md](CHECK.md) — 설계 대비 구현·보안 점검 결과
+- [CHECK.md](CHECK.md) — 사이클 1(개념 트리) 설계 대비 구현·보안 점검 결과(사이클 2 점검은 PLAN 사이클 2 절에 요약)
 - [CLAUDE.md](CLAUDE.md) — 이 프로젝트의 작업 규칙
 
 ## 보안 메모

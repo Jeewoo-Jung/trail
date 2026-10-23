@@ -60,8 +60,9 @@ export async function listActivities(store: NodeStore, rawInput: unknown, now: D
 
   const activityNodes = nodes.filter((n) => visible.has(n.id) && hasStar(n.kind)).sort(recent).slice(0, ACTIVITY_CANDIDATES_MAX);
   const activities: ActivityCandidate[] = [];
+  const fieldsByNode = await store.listFieldsMany(activityNodes.map((n) => n.id));
   for (const n of activityNodes) {
-    const fields = await store.listFields(n.id);
+    const fields = fieldsByNode.get(n.id) ?? [];
     activities.push({
       id: n.id,
       kind: n.kind,

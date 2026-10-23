@@ -4,7 +4,7 @@
 // 모든 필드를 바로(인라인) 고치고, 고친 필드는 잠금 표시가 붙는다. actions가 없으면(샘플 화면) 읽기 전용이다.
 import { Lock } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { FieldEditor } from "@/components/field-editor";
 import { openStoredFile, removeStoredFile, uploadOutputFile } from "@/components/stored-files";
 import type { NodeActions } from "@/components/node-actions";
@@ -120,7 +120,8 @@ function NodeProps({ tree, data, node, parent, hasFields, actions }: { tree: Nod
   const move = useAction();
   const dirty = name !== node.name || kind !== node.kind || status !== node.portfolioStatus || start !== (node.startDate ?? "") || end !== (node.endDate ?? "") || description !== node.description;
   const kinds = kindChoices(node, parent, hasFields);
-  const targets = actions ? moveTargets(tree, data.nodes, node.id) : [];
+  // 옮길 곳 목록 계산은 무거워서(후보마다 규칙 검사) 입력할 때마다 다시 하지 않는다
+  const targets = useMemo(() => (actions ? moveTargets(tree, data.nodes, node.id) : []), [actions, tree, data.nodes, node.id]);
 
   if (!actions) {
     return (
@@ -231,6 +232,9 @@ function Outputs({ nodeId, outputs, actions, userId }: { nodeId: string; outputs
   const [url, setUrl] = useState("");
   const [final, setFinal] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editUrl, setEditUrl] = useState("");
   const act = useAction();
   const file = useAction();
   return (
@@ -240,14 +244,26 @@ function Outputs({ nodeId, outputs, actions, userId }: { nodeId: string; outputs
       <ul className="flex flex-col gap-2">
         {outputs.map((o) => (
           <li key={o.id} className="flex flex-wrap items-center gap-2 text-sm">
-            {o.isFinal && <Badge tone="ok">최종</Badge>}
-            {o.url ? <a href={o.url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">{o.name}</a> : <span>{o.name}</span>}
-            {o.storagePath && <button type="button" className="text-accent hover:underline" onClick={() => void openStoredFile(o.storagePath!).then((m) => m && file.run(async () => ({ ok: false, message: m })))}>파일 열기</button>}
-            {actions && (
-              <span className="ml-auto flex gap-1">
-                <button type="button" disabled={act.pending} className={buttonClass.secondary} onClick={() => act.run(() => actions.updateOutput(o.id, { name: o.name, url: o.url ?? "", isFinal: !o.isFinal }))}>{o.isFinal ? "최종 해제" : "최종으로"}</button>
-                <button type="button" disabled={act.pending} className={buttonClass.secondary} onClick={() => act.run(() => actions.removeOutput(o.id), (r) => { if (r.ok && r.storagePath) void removeStoredFile(r.storagePath); })}>지우기</button>
-              </span>
+            {editing === o.id && actions ? (
+              <form className="flex w-full flex-wrap items-center gap-2" onSubmit={(e) => { e.preventDefault(); act.run(() => actions.updateOutput(o.id, { name: editName, url: editUrl, isFinal: o.isFinal }), () => setEditing(null)); }}>
+                <input value={editName} onChange={(e) => setEditName(e.target.value)} aria-label="산출물 이름 고치기" maxLength={NODE_LIMITS.outputNameMaxChars} className={`${inputClass} min-w-0 flex-1`} />
+                {!o.storagePath && <input value={editUrl} onChange={(e) => setEditUrl(e.target.value)} aria-label="산출물 링크 고치기" placeholder="링크(선택)" className={`${inputClass} min-w-0 flex-1`} />}
+                <button type="submit" disabled={act.pending || editName.trim() === ""} className={buttonClass.primary}>저장</button>
+                <button type="button" className={buttonClass.secondary} onClick={() => setEditing(null)}>취소</button>
+              </form>
+            ) : (
+              <>
+                {o.isFinal && <Badge tone="ok">최종</Badge>}
+                {o.url ? <a href={o.url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">{o.name}</a> : <span>{o.name}</span>}
+                {o.storagePath && <button type="button" className="text-accent hover:underline" onClick={() => void openStoredFile(o.storagePath!).then((m) => m && file.run(async () => ({ ok: false, message: m })))}>파일 열기</button>}
+                {actions && (
+                  <span className="ml-auto flex gap-1">
+                    <button type="button" disabled={act.pending} className={buttonClass.secondary} onClick={() => { setEditing(o.id); setEditName(o.name); setEditUrl(o.url ?? ""); }}>고치기</button>
+                    <button type="button" disabled={act.pending} className={buttonClass.secondary} onClick={() => act.run(() => actions.updateOutput(o.id, { name: o.name, url: o.url ?? "", isFinal: !o.isFinal }))}>{o.isFinal ? "최종 해제" : "최종으로"}</button>
+                    <button type="button" disabled={act.pending} className={buttonClass.secondary} onClick={() => act.run(() => actions.removeOutput(o.id), (r) => { if (r.ok && r.storagePath) void removeStoredFile(r.storagePath); })}>지우기</button>
+                  </span>
+                )}
+              </>
             )}
           </li>
         ))}
@@ -284,14 +300,18 @@ function Outputs({ nodeId, outputs, actions, userId }: { nodeId: string; outputs
                     file.run(async () => ({ ok: false, message: up.message }));
                     return;
                   }
-                  file.run(
-                    async () => {
+                  file.run(async () => {
+                    try {
                       const added = await actions.addOutput(nodeId, { name: picked.name.slice(0, NODE_LIMITS.outputNameMaxChars), isFinal: final, storagePath: up.path });
                       if (!added.ok) await removeStoredFile(up.path); // 기록하지 못한 파일은 남기지 않는다
-                      setUploading(false);
                       return added;
-                    },
-                  );
+                    } catch (e) {
+                      await removeStoredFile(up.path);
+                      throw e;
+                    } finally {
+                      setUploading(false);
+                    }
+                  });
                 }}
               />
               {uploading && <span>올리는 중…</span>}

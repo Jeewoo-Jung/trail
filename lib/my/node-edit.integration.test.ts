@@ -223,6 +223,63 @@ describe.skipIf(!enabled)("노드·활동 카드 편집 (실제 로그인으로 
     expect(await removeOutput(client, o[0].id)).toMatchObject({ ok: false });
   });
 
+  it("결과 상태만 바꾸는 일(나중에·해당 없음)은 '마지막 기록' 시각을 갱신하지 않고, 이름 같은 내용 수정은 갱신한다", async () => {
+    const id = await make("시각활동", "activity");
+    const t0 = (await row(id)).updated_at as string;
+    await new Promise((r) => setTimeout(r, 1100));
+    expect(await setResultState(client, id, "snooze", 3)).toEqual({ ok: true });
+    expect(await setResultState(client, id, "not_applicable", 3)).toEqual({ ok: true });
+    expect((await row(id)).updated_at).toBe(t0);
+    expect(await updateNode(client, id, { description: "고침" })).toEqual({ ok: true });
+    expect(Date.parse((await row(id)).updated_at)).toBeGreaterThan(Date.parse(t0));
+  });
+
+  it("항목을 비우면 '비움'이 기억되고(AI가 다시 채우지 못함), 다시 쓰면 풀린다", async () => {
+    const id = await make("비움활동", "activity");
+    await setFieldText(client, id, "situation", "쓴 내용", "did");
+    expect((await row(id)).cleared_fields).toEqual([]);
+    await setFieldText(client, id, "situation", "", "did");
+    expect((await row(id)).cleared_fields).toEqual(["situation"]);
+    expect((await fieldsOf(id)).situation).toBeUndefined();
+    await setFieldText(client, id, "situation", "다시 씀", "did");
+    expect((await row(id)).cleared_fields).toEqual([]);
+  });
+
+  it("쪼개기·합치기로 외부 결과가 옮겨지면 두 활동의 결과 상태가 실제에 맞게 다시 계산된다", async () => {
+    const proj = await make("결과쪼개기프로젝트", "project");
+    const a = await make("결과쪼갤활동", "activity", proj);
+    await setFieldText(client, a, "result_external", "1차 합격", "did");
+    await setFieldText(client, a, "action", "한 일", "did");
+    expect((await row(a)).result_state).toBe("filled");
+    const split = await splitActivity(client, a, "__시험결과받는활동", ["result_external"], []);
+    expect(split).toMatchObject({ ok: true });
+    const b = (split as { id: string }).id;
+    expect((await row(a)).result_state).toBe("empty");
+    expect((await row(b)).result_state).toBe("filled");
+    expect(await mergeActivities(client, a, b)).toMatchObject({ ok: true });
+    expect((await row(a)).result_state).toBe("filled");
+  });
+
+  it("산출물 링크는 데이터베이스에서도 http(s)만 받는다", async () => {
+    const id = await make("링크활동", "activity");
+    expect((await client.from("outputs").insert({ node_id: id, name: "나쁨", url: "javascript:alert(1)" })).error).not.toBeNull();
+    expect((await client.from("outputs").insert({ node_id: id, name: "좋음", url: "https://example.com/a" })).error).toBeNull();
+    expect((await client.from("outputs").insert({ node_id: id, name: "공백", url: "https://example.com/a b" })).error).not.toBeNull();
+  });
+
+  it("완전히 지우면 산출물에 붙은 첨부 파일도 Storage에서 지운다", async () => {
+    const id = await make("파일활동", "activity");
+    const { data: me } = await client.auth.getUser();
+    const uid = me.user!.id;
+    const path = `${uid}/${id}/${crypto.randomUUID()}-test.txt`;
+    expect((await client.storage.from("trail-files").upload(path, new Blob(["가상 내용"]))).error).toBeNull();
+    expect(await addOutput(client, id, { name: "test.txt", storagePath: path }, uid)).toEqual({ ok: true });
+    expect((await client.storage.from("trail-files").download(path)).error).toBeNull();
+    await trashNode(client, id);
+    expect(await purgeNode(client, id)).toEqual({ ok: true });
+    expect((await client.storage.from("trail-files").download(path)).error).not.toBeNull();
+  });
+
   it("합치기: 항목은 이어 붙이고, 근거·산출물·세부활동을 옮기며, 합친 쪽은 휴지통에 간다", async () => {
     const proj = await make("합치기프로젝트", "project");
     const a = await make("합칠A", "activity", proj);

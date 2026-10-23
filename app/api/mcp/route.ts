@@ -140,7 +140,8 @@ const handler = createMcpHandler(
         description:
           "사용자가 말한 활동의 결과(합격·평가 등 외부 결과)와 최종 산출물을 그 활동에 저장한다. action=save는 사용자가 실제로 말한 내용만 text·outputs에 담아 보낸다(지어내지 않는다). action=not_applicable은 사용자가 결과가 없다고 한 활동을 더 묻지 않게 한다. action=asked는 이 활동의 결과를 방금 사용자에게 물었다는 표시이며 활동당 한 번만 묻는다. 앱 화면에서 입력한 것과 같은 데이터가 갱신된다.",
         inputSchema: z.object({
-          nodeId: z.string().describe("결과를 저장할 활동의 id(list_cards의 resultsPending[].id 또는 activities[].id)."),
+          nodeId: z.string().describe("결과를 저장할 활동의 id(list_cards의 resultsPending[].id). 세부활동 id는 받지 않는다."),
+          conversationKey: z.string().optional().describe("이 대화의 키(제안을 남길 때 출처로 기록한다)."),
           action: z.enum(["save", "not_applicable", "asked"]).describe("save=결과 저장, not_applicable=해당 없음, asked=결과를 물었다는 표시."),
           text: z.string().optional().describe("save일 때 사용자가 말한 외부 결과(300자 이하)."),
           outputs: z.array(z.object({ name: z.string(), url: z.string().optional() })).max(5).optional().describe("save일 때 사용자가 말한 최종 산출물(이름, 선택적으로 http(s) 링크)."),

@@ -11,7 +11,12 @@ export function useAction() {
   const [message, setMessage] = useState<ActionMessage>(null);
   const run = (job: () => Promise<EditResult>, onOk?: (r: EditResult) => void) =>
     start(async () => {
-      const result = await job();
+      let result: EditResult;
+      try {
+        result = await job();
+      } catch {
+        result = { ok: false, message: "처리하지 못했습니다. 잠시 뒤 다시 시도해 주세요." };
+      }
       setMessage(result.ok ? (result.message ? { ok: true, text: result.message } : null) : { ok: false, text: result.message });
       if (result.ok) onOk?.(result);
     });

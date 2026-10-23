@@ -88,7 +88,7 @@ export function subtreeIds(nodes: readonly NodeRef[], id: string): string[] {
   return out;
 }
 
-const subtreeHeight = (nodes: readonly NodeRef[], id: string): number => 1 + Math.max(0, ...nodes.filter((n) => n.parentId === id).map((n) => subtreeHeight(nodes, n.id)));
+export const subtreeHeight = (nodes: readonly NodeRef[], id: string): number => 1 + Math.max(0, ...nodes.filter((n) => n.parentId === id).map((n) => subtreeHeight(nodes, n.id)));
 
 /** 새 노드를 parentId 아래에 만들어도 되는지(종류·단계·개수) */
 export function checkAddNode(nodes: readonly NodeRef[], parentId: string | null, kind: NodeKind): Checked<null> {

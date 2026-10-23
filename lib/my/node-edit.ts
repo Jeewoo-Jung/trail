@@ -3,7 +3,7 @@
 // 내가 고친 필드는 잠근다(잠금은 AI 기록이 덮어쓰지 않게 하는 표시다). 예상된 실패는 {ok:false, message}로 돌려주고, 저장소 오류는 던진다.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { StoreError } from "../mcp/errors";
-import { NODE_LIMITS, STAR_LIMITS } from "../rules/limits";
+import { EVIDENCE_LIMITS, FILE_LIMITS, NODE_LIMITS, STAR_LIMITS } from "../rules/limits";
 import { snoozeUntil } from "../rules/results";
 import { canBeChild, checkAddNode, checkEvidence, checkField, checkMoveNode, checkNodeInput, hasStar, mergeField, STAR_FIELD_LABEL, STAR_FIELDS, type NodeKind, type NodeLockable, type PortfolioStatus, type StarField } from "../rules/nodes";
 
@@ -134,11 +134,27 @@ export async function restoreNode(client: SupabaseClient, id: string): Promise<E
   return { ok: true };
 }
 
-/** 휴지통에 있는 노드만 완전히 지운다(아래 가지·항목·근거도 함께 사라진다) */
+/** 휴지통에 있는 노드만 완전히 지운다(아래 가지·항목·근거도 함께 사라지고, 산출물에 붙은 첨부 파일도 Storage에서 지운다) */
 export async function purgeNode(client: SupabaseClient, id: string): Promise<EditResult> {
+  const rows = await loadRows(client);
+  const target = rows.find((r) => r.id === id);
+  if (!target || !target.deleted_at) return NOT_FOUND;
+  const below = new Set<string>([id]);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const r of rows) if (r.parent_id && below.has(r.parent_id) && !below.has(r.id)) { below.add(r.id); grew = true; }
+  }
+  const files = await client.from("outputs").select("storage_path").in("node_id", [...below]).not("storage_path", "is", null);
+  check(files.error, "첨부 파일 읽기");
   const { data, error } = await client.from("nodes").delete().eq("id", id).not("deleted_at", "is", null).select("id");
   check(error, "완전히 지우기");
-  return (data?.length ?? 0) > 0 ? { ok: true } : NOT_FOUND;
+  if ((data?.length ?? 0) === 0) return NOT_FOUND;
+  const paths = (files.data ?? []).map((f) => f.storage_path as string);
+  if (paths.length > 0) {
+    const removed = await client.storage.from("trail-files").remove(paths);
+    if (removed.error) console.error("[my] 첨부 파일 정리 실패", paths.length);
+  }
+  return { ok: true };
 }
 
 // ───────── STAR 항목 ─────────
@@ -160,13 +176,27 @@ export async function setFieldText(client: SupabaseClient, nodeId: string, field
     check(del.error, "항목 지우기");
     const ev = await client.from("evidence").delete().eq("node_id", nodeId).eq("field", v.field);
     check(ev.error, "근거 지우기");
+    await setCleared(client, nodeId, v.field, true);
     if (v.field === "result_external") await syncResultState(client, nodeId);
     return { ok: true };
   }
   const { error } = await client.from("node_fields").upsert({ node_id: nodeId, field: v.field, text: v.text, subject: v.subject, locked: true, updated_by: "user", updated_at: new Date().toISOString() }, { onConflict: "node_id,field" });
   check(error, "항목 저장");
+  await setCleared(client, nodeId, v.field, false);
   if (v.field === "result_external") await syncResultState(client, nodeId);
   return { ok: true };
+}
+
+/** 내가 비운 항목 표시(cleared_fields)를 켜거나 끈다. 비운 항목은 AI 기록이 다시 채우지 않는다. */
+async function setCleared(client: SupabaseClient, nodeId: string, field: StarField, cleared: boolean): Promise<void> {
+  const { data, error } = await client.from("nodes").select("cleared_fields").eq("id", nodeId).maybeSingle();
+  check(error, "노드 읽기");
+  const now = new Set<string>((data?.cleared_fields as string[] | undefined) ?? []);
+  if (now.has(field) === cleared) return;
+  if (cleared) now.add(field);
+  else now.delete(field);
+  const upd = await client.from("nodes").update({ cleared_fields: [...now] }).eq("id", nodeId);
+  check(upd.error, "비움 표시 저장");
 }
 
 export async function setFieldSubject(client: SupabaseClient, nodeId: string, field: unknown, subject: unknown): Promise<EditResult> {
@@ -238,7 +268,7 @@ export async function resolveSuggestion(client: SupabaseClient, id: string, mode
     // 제안에 딸린 근거를 가능한 만큼 붙인다
     const have = await client.from("evidence").select("id", { count: "exact", head: true }).eq("node_id", s.node_id).eq("field", field);
     check(have.error, "근거 세기");
-    const room = Math.max(0, 3 - (have.count ?? 0));
+    const room = Math.max(0, EVIDENCE_LIMITS.maxPerField - (have.count ?? 0));
     const list = (Array.isArray(s.evidence) ? s.evidence : []).slice(0, room) as { conversationTitle: string; conversationDate: string; excerpt: string }[];
     for (const e of list) await addEvidence(client, s.node_id, field, e);
   }
@@ -252,7 +282,7 @@ export async function resolveSuggestion(client: SupabaseClient, id: string, mode
 const urlOk = (url: string) => /^https?:\/\/\S+$/i.test(url) && url.length <= NODE_LIMITS.urlMaxChars;
 
 /** 첨부 파일 경로는 "<내 id>/<노드 id>/<파일>" 모양이어야 한다(다른 사람·다른 노드의 파일을 가리키지 못하게 한다) */
-const pathOk = (path: string, userId: string, nodeId: string) => path.length <= 300 && path.startsWith(`${userId}/${nodeId}/`) && !path.slice(userId.length + nodeId.length + 2).includes("/") && !path.includes("..");
+const pathOk = (path: string, userId: string, nodeId: string) => path.length <= FILE_LIMITS.pathMaxChars && path.startsWith(`${userId}/${nodeId}/`) && !path.slice(userId.length + nodeId.length + 2).includes("/") && !path.includes("..");
 
 type OutputInput = { name: string; url?: string; isFinal?: boolean; storagePath?: string };
 
@@ -342,6 +372,7 @@ export async function mergeActivities(client: SupabaseClient, keepId: string, ot
     if (/node_not_found|same_node/.test(m)) return NOT_FOUND;
     throw new StoreError("합치기", error.code);
   }
+  await syncResultState(client, keepId); // 외부 결과·최종 산출물이 옮겨졌을 수 있다
   return { ok: true, message: "합쳤습니다. 합친 쪽은 휴지통에 있습니다." };
 }
 
@@ -356,5 +387,8 @@ export async function splitActivity(client: SupabaseClient, id: string, name: un
     if (/node_not_found/.test(error.message)) return NOT_FOUND;
     throw new StoreError("쪼개기", error.code);
   }
+  // 외부 결과·최종 산출물은 항목·산출물 쪽에서 옮겨 가므로 결과 상태를 두 활동 모두 다시 맞춘다(산출물은 원래 활동에 남는다)
+  await syncResultState(client, id);
+  await syncResultState(client, data as string);
   return { ok: true, id: data as string, message: "새 활동으로 쪼갰습니다." };
 }

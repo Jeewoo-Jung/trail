@@ -42,7 +42,7 @@ export function createSupabaseNodeStore(client: SupabaseClient): NodeStore {
     },
 
     async listNodes(): Promise<StoredNode[]> {
-      const { data, error } = await client.from("nodes").select("id, parent_id, kind, name, description, start_date, end_date, portfolio_status, locked_fields, deleted_at, updated_at, result_state, result_snooze_until, result_asked_at");
+      const { data, error } = await client.from("nodes").select("id, parent_id, kind, name, description, start_date, end_date, portfolio_status, locked_fields, cleared_fields, deleted_at, updated_at, result_state, result_snooze_until, result_asked_at");
       check(error, "노드 읽기");
       return (data ?? []).map((r) => ({
         id: r.id,
@@ -54,6 +54,7 @@ export function createSupabaseNodeStore(client: SupabaseClient): NodeStore {
         endDate: r.end_date,
         portfolioStatus: r.portfolio_status as PortfolioStatus,
         lockedFields: (r.locked_fields ?? []) as NodeLockable[],
+        clearedFields: (r.cleared_fields ?? []) as StarField[],
         deletedAt: r.deleted_at,
         updatedAt: r.updated_at,
         resultState: r.result_state,
@@ -78,9 +79,18 @@ export function createSupabaseNodeStore(client: SupabaseClient): NodeStore {
     },
 
     async listFields(nodeId: string): Promise<StoredField[]> {
-      const { data, error } = await client.from("node_fields").select("field, text, locked").eq("node_id", nodeId);
+      const { data, error } = await client.from("node_fields").select("field, text, locked, subject").eq("node_id", nodeId);
       check(error, "항목 읽기");
-      return (data ?? []).map((r) => ({ field: r.field as StarField, text: r.text, locked: r.locked }));
+      return (data ?? []).map((r) => ({ field: r.field as StarField, text: r.text, locked: r.locked, subject: r.subject as Subject }));
+    },
+
+    async listFieldsMany(nodeIds: readonly string[]): Promise<Map<string, StoredField[]>> {
+      const out = new Map<string, StoredField[]>();
+      if (nodeIds.length === 0) return out;
+      const { data, error } = await client.from("node_fields").select("node_id, field, text, locked, subject").in("node_id", [...nodeIds]);
+      check(error, "항목 읽기");
+      for (const r of data ?? []) out.set(r.node_id, [...(out.get(r.node_id) ?? []), { field: r.field as StarField, text: r.text, locked: r.locked, subject: r.subject as Subject }]);
+      return out;
     },
 
     async upsertField(nodeId: string, field: StarField, text: string, subject: Subject): Promise<void> {
@@ -133,7 +143,7 @@ export function createSupabaseNodeStore(client: SupabaseClient): NodeStore {
     },
 
     async setResultText(nodeId: string, text: string): Promise<void> {
-      const { error } = await client.from("node_fields").upsert({ node_id: nodeId, field: "result_external", text, subject: "did", locked: true, updated_by: "user", updated_at: new Date().toISOString() }, { onConflict: "node_id,field" });
+      const { error } = await client.from("node_fields").upsert({ node_id: nodeId, field: "result_external", text, subject: "did", locked: false, updated_by: "ai", updated_at: new Date().toISOString() }, { onConflict: "node_id,field" });
       check(error, "결과 저장");
     },
 

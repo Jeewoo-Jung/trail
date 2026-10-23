@@ -130,7 +130,7 @@ describe.skipIf(!enabled)("활동 기록·병합 (실제 로그인으로 시험)
 
     expect(await recordResult(store, { nodeId: a, action: "save", text: "1차 합격", outputs: [{ name: "__시험최종본", url: "https://example.com/final" }] })).toMatchObject({ ok: true, output: { status: "saved", textSaved: true, outputsAdded: 1 } });
     const f = (await client.from("node_fields").select("text, subject, locked, updated_by").eq("node_id", a).eq("field", "result_external").single()).data!;
-    expect(f).toMatchObject({ text: "1차 합격", locked: true, updated_by: "user" });
+    expect(f).toMatchObject({ text: "1차 합격", locked: false, updated_by: "ai" });
     expect((await client.from("outputs").select("name, is_final").eq("node_id", a)).data).toEqual([{ name: "__시험최종본", is_final: true }]);
     expect((await client.from("nodes").select("result_state").eq("id", a).single()).data?.result_state).toBe("filled");
 
@@ -138,6 +138,39 @@ describe.skipIf(!enabled)("활동 기록·병합 (실제 로그인으로 시험)
     const after = await listActivities(store, {});
     expect(after.ok && after.output.resultsPending.some((r) => [a, b].includes(r.id))).toBe(false);
     expect(await recordResult(store, { nodeId: "00000000-0000-4000-8000-000000000000", action: "save", text: "x" })).toMatchObject({ ok: true, output: { status: "rejected" } });
+  });
+
+  it("내가 비운 항목은 AI 기록이 다시 채우지 않고 제안으로 쌓는다(실제 저장소)", async () => {
+    const store = createSupabaseNodeStore(client);
+    const made = ok(await recordActivities(store, { activities: [{ name: "__시험비움", fields: { situation: fld("처음 상황") } }] }));
+    const id = made.results[0].nodeId!;
+    await client.from("node_fields").delete().eq("node_id", id).eq("field", "situation");
+    await client.from("nodes").update({ cleared_fields: ["situation"] }).eq("id", id);
+    const out = ok(await recordActivities(store, { activities: [{ nodeId: id, fields: { situation: fld("새 상황"), task: fld("과제") } }] }));
+    expect(out.results[0].fields).toEqual({ situation: "suggested", task: "set" });
+    expect((await client.from("node_fields").select("field").eq("node_id", id)).data!.map((f) => f.field)).toEqual(["task"]);
+    expect((await client.from("field_suggestions").select("field, text").eq("node_id", id)).data).toEqual([{ field: "situation", text: "새 상황" }]);
+  });
+
+  it("주체가 다른 내용은 덧붙이지 않고 제안으로 돌리며, 이미 있는 결과는 채팅으로 덮어쓰지 않는다(실제 저장소)", async () => {
+    const store = createSupabaseNodeStore(client);
+    const made = ok(await recordActivities(store, { activities: [{ name: "__시험주체", fields: { action: fld("한 일", "did") } }] }));
+    const id = made.results[0].nodeId!;
+    const out = ok(await recordActivities(store, { activities: [{ nodeId: id, fields: { action: fld("추정 내용", "estimate") } }] }));
+    expect(out.results[0].fields).toEqual({ action: "suggested" });
+    expect((await client.from("node_fields").select("text, subject").eq("node_id", id).eq("field", "action").single()).data).toEqual({ text: "한 일", subject: "did" });
+    expect(await recordResult(store, { nodeId: id, action: "save", text: "첫 결과" })).toMatchObject({ ok: true, output: { status: "saved", textSaved: true } });
+    expect((await client.from("node_fields").select("updated_by, locked").eq("node_id", id).eq("field", "result_external").single()).data).toEqual({ updated_by: "ai", locked: false });
+    expect(await recordResult(store, { nodeId: id, action: "save", text: "바꾸려는 결과" })).toMatchObject({ ok: true, output: { status: "saved", suggested: true, textSaved: false } });
+    expect((await client.from("node_fields").select("text").eq("node_id", id).eq("field", "result_external").single()).data?.text).toBe("첫 결과");
+    expect((await client.from("field_suggestions").select("text").eq("node_id", id).eq("field", "result_external")).data).toEqual([{ text: "바꾸려는 결과" }]);
+  });
+
+  it("'기록하지 않기'처럼 활동이 없어도 질문한 주제와 횟수가 저장된다", async () => {
+    const store = createSupabaseNodeStore(client);
+    const out = ok(await recordActivities(store, { questionCount: 2, topicKey: "__시험거절주제", activities: [] }));
+    expect(await store.listAskedTopics(out.conversationKey)).toEqual(["__시험거절주제"]);
+    expect((await client.from("conversations").select("question_count").eq("key", out.conversationKey).single()).data?.question_count).toBe(2);
   });
 
   it("모르는 대화 키·잘못된 입력은 거절한다", async () => {

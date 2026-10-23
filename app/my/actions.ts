@@ -14,7 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function logout() {
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: "local" }); // 이 기기의 로그인만 끝낸다(Claude 커넥터 세션은 끊지 않는다)
   redirect("/login");
 }
 

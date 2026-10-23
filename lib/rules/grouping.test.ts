@@ -94,6 +94,14 @@ describe("checkApplyGroup", () => {
     expect(checkApplyGroup(nodes, ["a", "t"], "project").ok).toBe(false);
     expect(checkApplyGroup(nodes, ["a", "x"], "project").ok).toBe(false);
   });
+  it("묶으면 단계 한도를 넘는 가지가 생길 때 막는다", () => {
+    const chain: GroupableNode[] = [n("c0", null, "category")];
+    for (let i = 1; i < 6; i += 1) chain.push(n(`c${i}`, `c${i - 1}`, "category"));
+    // c5 아래에 프로젝트 둘 + 그 아래 활동·세부활동까지 달아 가장 깊은 가지를 만든다(6단계 + 프로젝트 7 + 활동 8 + 세부활동 9)
+    const deep = [...chain, n("pa", "c5", "project"), n("pb", "c5", "project"), n("aa", "pa", "activity"), n("ss", "aa", "subactivity")];
+    expect(checkApplyGroup(deep, ["pa", "pb"], "category").ok).toBe(false);
+    expect(checkApplyGroup(deep, ["aa", "ss"].slice(0, 1).concat("pb"), "category").ok).toBe(false); // 부모가 다른 노드 섞기
+  });
   it("그 위치에 새 노드를 둘 수 없으면 막는다", () => {
     const nested = [n("p", null, "project"), n("a", "p", "activity"), n("b", "p", "activity")];
     expect(checkApplyGroup(nested, ["a", "b"], "project").ok).toBe(false);

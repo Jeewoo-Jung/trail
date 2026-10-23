@@ -79,6 +79,24 @@ describe("toMarkdown", () => {
   });
 });
 
+describe("toMarkdown: HTML·링크 이스케이프", () => {
+  it("본문·발췌의 HTML 태그와 링크 주소의 괄호·꺾쇠는 그대로 들어가지 않는다", () => {
+    const evil: NodeData = {
+      ...EMPTY_DATA,
+      nodes: [n("p", null, "project", "프로젝트 <b>굵게</b>"), n("a", "p", "activity", "활동")],
+      fields: [f("a", "action", "본문 <img src=x onerror=alert(1)> & 끝")],
+      evidence: [ev("e", "a", "action", "<script>x</script> 발췌")],
+      outputs: [out("o", "a", "링크", { url: "https://example.com/a)b<c> d" })],
+    };
+    const md = toMarkdown(buildStarDocument(evil, "p")!, new Date("2026-10-30T00:00:00Z"));
+    expect(md).not.toContain("<img");
+    expect(md).not.toContain("<script");
+    expect(md).not.toContain("<b>");
+    expect(md).toContain("&lt;img src=x onerror=alert(1)&gt; &amp; 끝");
+    expect(md).toContain("[링크](https://example.com/a%29b%3Cc%3E%20d)");
+  });
+});
+
 describe("toJson / exportFileNames", () => {
   it("JSON은 형식 표시·항목별 주체와 근거·산출물을 담고 제외 노드는 없다", () => {
     const j = JSON.parse(toJson(buildStarDocument(data, "p")!, new Date("2026-10-30T00:00:00Z")));

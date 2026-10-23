@@ -67,8 +67,12 @@ export function buildStarDocument(data: NodeData, rootId: string | null): StarDo
 
 // ───────── Markdown ─────────
 
-const mdText = (text: string): string => text.replace(/^(#{1,6}\s)/gm, "\\$1"); // 본문 줄이 제목으로 바뀌지 않게
-const mdInline = (text: string): string => text.replace(/[[\]]/g, "\\$&");
+// 본문 줄이 제목으로 바뀌지 않게, 그리고 HTML로 해석되지 않게(추적 이미지·링크 변조 방지) < > &를 바꾼다
+const htmlSafe = (text: string): string => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const mdText = (text: string): string => htmlSafe(text).replace(/^(#{1,6}\s)/gm, "\\$1");
+const mdInline = (text: string): string => htmlSafe(text).replace(/[[\]]/g, "\\$&");
+/** 링크 주소의 ( ) < > 와 공백은 퍼센트 인코딩해서 링크 문법을 깨거나 빠져나가지 못하게 한다 */
+const mdUrl = (url: string): string => url.replace(/[()<>\s]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`); // encodeURIComponent는 ( )를 그대로 두므로 직접 바꾼다
 const period = (n: { startDate: string | null; endDate: string | null }): string => (n.startDate || n.endDate ? `${n.startDate ?? "?"} ~ ${n.endDate ?? "?"}` : "");
 
 function nodeMarkdown(n: DocNode, level: number, out: string[]): void {
@@ -79,11 +83,11 @@ function nodeMarkdown(n: DocNode, level: number, out: string[]): void {
   if (n.description.trim()) out.push(mdText(n.description.trim()), "");
   for (const f of n.fields) {
     out.push(`**${f.label}** _(${f.subjectLabel})_`, "", mdText(f.text.trim()), "");
-    for (const e of f.evidence) out.push(`> “${e.excerpt.replace(/\n+/g, " ")}” — ${mdInline(e.conversationTitle)}, ${e.conversationDate}`, "");
+    for (const e of f.evidence) out.push(`> “${htmlSafe(e.excerpt.replace(/\n+/g, " "))}” — ${mdInline(e.conversationTitle)}, ${e.conversationDate}`, "");
   }
   if (n.outputs.length > 0) {
     out.push("**산출물**", "");
-    for (const o of n.outputs) out.push(`- ${o.isFinal ? "[최종] " : ""}${o.url ? `[${mdInline(o.name)}](${o.url})` : mdInline(o.name)}${o.hasFile ? " (첨부 파일 있음 — 앱에서 내려받기)" : ""}`);
+    for (const o of n.outputs) out.push(`- ${o.isFinal ? "[최종] " : ""}${o.url ? `[${mdInline(o.name)}](${mdUrl(o.url)})` : mdInline(o.name)}${o.hasFile ? " (첨부 파일 있음 — 앱에서 내려받기)" : ""}`);
     out.push("");
   }
   for (const c of n.children) nodeMarkdown(c, level + 1, out);

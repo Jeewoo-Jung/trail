@@ -32,11 +32,11 @@
 | 스타일 | Tailwind CSS 4 (`@tailwindcss/turbopack`) |
 | 검사 | ESLint 9 (`eslint-config-next`) |
 | 경로 별칭 | `@/*` → 프로젝트 루트 |
-| 저장소·로그인 | Supabase (Postgres + Auth + OAuth 2.1 서버) — 연결·적용 완료 |
-| AI | Claude API, 기본 모델 `claude-haiku-5-5` — 연결 완료(분류 보정) |
+| 저장소·로그인·파일 | Supabase (Postgres + Auth + OAuth 2.1 서버 + Storage) — 연결·적용 완료 |
+| AI | Claude API, 기본 모델 `claude-haiku-5-5` — 연결 완료(상향식 묶기 제안만, 키가 없으면 이 기능만 꺼짐) |
 | 배포 | Vercel |
 
-**현재 상태는 PLAN.md의 체크박스가 기준이다.** Supabase·Claude SDK·zod·vitest·MCP 라이브러리는 설치돼 있고, `/`는 가상 샘플 화면, `/my`는 로그인 후 개념 트리다. 아직 없는 것은 배포(PLAN 7)와 커넥터 등록(PLAN 13) 같은 PLAN의 미체크 항목이다.
+**현재 상태는 PLAN.md의 체크박스가 기준이다.** Supabase·Claude SDK·zod·vitest·MCP 라이브러리는 설치돼 있고, `/`는 가상 샘플 화면(노드 트리 + STAR 문서 미리보기), `/my`는 로그인 후 노드 트리·인라인 편집, `/my/documents`는 STAR 문서와 내려받기다. 배포는 끝났고, 남은 것은 PLAN의 미체크 항목(Anthropic 콘솔 월 한도 설정 등 내가 직접 할 일)이다.
 
 ### Next.js 설정에서 조심할 것
 
@@ -106,7 +106,7 @@ trash-can/      지울 파일을 옮겨 두는 곳 (git 제외, 내가 직접 �
 
 - TypeScript `strict`를 지킨다. `any`는 쓰지 않는다.
 - **비밀값을 읽는 코드는 서버에서만** 쓴다. 브라우저로 가는 코드와 `NEXT_PUBLIC_` 변수에는 비밀값을 넣지 않는다.
-- 밖에서 들어오는 값(요청, Claude가 보낸 카드)은 쓰기 전에 한곳에서 검증한다. PRD.md·DESIGN.md §14의 한도(STAR 항목별 글자 수, 근거 발췌 300자, 이름 길이, 노드 깊이·개수, 요청 20KB)를 코드에 숫자로 적고 테스트한다.
+- 밖에서 들어오는 값(요청, Claude가 보낸 활동 기록)은 쓰기 전에 한곳에서 검증한다. PRD.md·DESIGN.md §14의 한도(STAR 항목별 글자 수, 근거 발췌 300자, 이름 길이, 노드 깊이·개수, 요청 20KB)를 코드에 숫자로 적고 테스트한다.
 - 규칙이 있는 로직(분류 규칙, 한도, 비밀값 가리기)은 단위 테스트를 같이 만든다.
 - 주석은 "왜 그렇게 했는지"만 짧게 한국어로 쓴다. 코드가 이미 말하는 것은 적지 않는다.
 - 주변 코드의 이름과 스타일을 따른다.
@@ -143,7 +143,7 @@ trash-can/      지울 파일을 옮겨 두는 곳 (git 제외, 내가 직접 �
 
 ## 12. 알려진 확인 필요·정리할 것
 
-- Supabase 신규 가입 차단 설정과 OAuth 서버 켜기: 해당 개발 단위에서 확인하고 적용한다.
+- Supabase 신규 가입 차단·OAuth 서버·Storage 버킷 설정은 적용했다(PRD 8번, DESIGN §14.6). 설정을 더 바꿀 때는 나에게 먼저 확인받는다.
 - Supabase 실시간 갱신이 로그인 권한과 함께 실제로 동작하는지: 구현할 때 시험한다.
 - Claude 대화 내보내기 파일의 형식: 공식 안내에 없어서, 실제 파일을 받아 확인한 뒤 분석 기능을 만든다.
 - `.gitignore`의 `.env*` 규칙이 `.env.example`까지 막는다. 견본 파일을 만들 때 예외 규칙을 추가한다.

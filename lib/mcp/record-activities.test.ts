@@ -30,6 +30,18 @@ describe("recordActivities: 새 활동 만들기", () => {
     expect(store.nodes.filter((n) => n.kind === "project")).toHaveLength(1);
     expect(store.nodes.find((n) => n.kind === "activity")!.parentId).toBe(p.id);
   });
+  it("프로젝트가 범주 아래로 옮겨진 뒤에도 같은 이름이면 새로 만들지 않고, 같은 이름이 여러 개면 거절한다", async () => {
+    const store = new FakeNodeStore();
+    const cat = store.addNode({ kind: "category", name: "범주" });
+    const p = store.addNode({ kind: "project", name: "내 프로젝트", parentId: cat.id });
+    ok(await recordActivities(store, { activities: [{ name: "활동", projectName: "내 프로젝트" }] }));
+    expect(store.nodes.filter((n) => n.kind === "project")).toHaveLength(1);
+    expect(store.nodes.find((n) => n.kind === "activity")!.parentId).toBe(p.id);
+    store.addNode({ kind: "project", name: "내 프로젝트" });
+    const out = ok(await recordActivities(store, { activities: [{ name: "또 활동", projectName: "내 프로젝트" }] }));
+    expect(out.results[0]).toMatchObject({ status: "rejected" });
+    expect(out.results[0].reasons?.[0]).toContain("여러 개");
+  });
   it("위치가 없으면 맨 위에, parentId가 있으면 그 아래에 둔다. 규칙에 어긋나는 위치는 거절한다", async () => {
     const store = new FakeNodeStore();
     const proj = store.addNode({ kind: "project", name: "P" });
@@ -77,6 +89,29 @@ describe("recordActivities: 항목(STAR)과 근거", () => {
 });
 
 describe("recordActivities: 기존 활동에 이어붙이기(병합)", () => {
+  it("덧붙이려는 내용의 주체가 다르면 덧붙이지 않고 제안으로 돌리고, 근거를 붙일 자리가 없어도 마찬가지다", async () => {
+    const store = new FakeNodeStore();
+    const node = store.addNode({ kind: "activity", name: "활동" });
+    ok(await recordActivities(store, { activities: [{ nodeId: node.id, fields: { action: fld("내가 한 일", "did", [ev("a"), ev("b"), ev("c")]) } }] }));
+    // 같은 주체지만 근거가 이미 3개라 덧붙일 수 없다
+    let out = ok(await recordActivities(store, { activities: [{ nodeId: node.id, fields: { action: fld("더 한 일", "did") } }] }));
+    expect(out.results[0].fields).toEqual({ action: "suggested" });
+    expect(store.fields.get(node.id)?.get("action")?.text).toBe("내가 한 일");
+    // 근거 자리가 있어도 주체가 다르면 제안
+    const other = store.addNode({ kind: "activity", name: "다른 활동" });
+    ok(await recordActivities(store, { activities: [{ nodeId: other.id, fields: { action: fld("한 일", "did") } }] }));
+    out = ok(await recordActivities(store, { activities: [{ nodeId: other.id, fields: { action: fld("추정 내용", "estimate") } }] }));
+    expect(out.results[0].fields).toEqual({ action: "suggested" });
+    expect(store.fields.get(other.id)?.get("action")).toMatchObject({ text: "한 일", subject: "did" });
+    expect(store.suggestions.map((s) => s.subject)).toContain("estimate");
+  });
+  it("내가 비워 둔 항목은 AI가 다시 채우지 않고 제안으로만 쌓는다", async () => {
+    const store = new FakeNodeStore();
+    const node = store.addNode({ kind: "activity", name: "활동", clearedFields: ["situation"] });
+    const out = ok(await recordActivities(store, { activities: [{ nodeId: node.id, fields: { situation: fld("새 상황"), task: fld("과제") } }] }));
+    expect(out.results[0].fields).toEqual({ situation: "suggested", task: "set" });
+    expect(store.fields.get(node.id)?.has("situation")).toBeFalsy();
+  });
   it("잠긴 항목은 그대로 두고 제안으로 쌓고, 잠기지 않은 항목은 덧붙이며, 비어 있는 항목은 채운다", async () => {
     const store = new FakeNodeStore();
     const node = store.addNode({ kind: "activity", name: "활동" });
@@ -166,6 +201,17 @@ describe("recordActivities: 산출물·대화·질문", () => {
     expect((await recordActivities(store, { questionCount: 4, activities: [] })).ok).toBe(false);
     expect((await recordActivities(store, { conversationKey: "abc", activities: [] })).ok).toBe(false);
     expect((await recordActivities(store, { conversationKey: "00000000-0000-4000-8000-000000000000", activities: [] })).ok).toBe(false);
+  });
+  it("\"기록하지 않기\"처럼 보낼 활동이 없어도 질문한 주제와 횟수를 기록한다", async () => {
+    const store = new FakeNodeStore();
+    const out = ok(await recordActivities(store, { questionCount: 1, topicKey: "거절한 주제", activities: [] }));
+    expect(await store.listAskedTopics(out.conversationKey)).toEqual(["거절한 주제"]);
+    expect(store.conversations.get(out.conversationKey)?.questionCount).toBe(1);
+  });
+  it("topicKey의 키 모양도 가려서 저장한다", async () => {
+    const store = new FakeNodeStore();
+    const out = ok(await recordActivities(store, { topicKey: "sk-ant-api03-abcdefghijklmnopqrstuvwx 주제", activities: [] }));
+    expect((await store.listAskedTopics(out.conversationKey)).join()).not.toContain("sk-ant-api03");
   });
   it("대화 키를 발급하고 질문한 주제를 기록하며, 저장이 하나도 안 되면 주제를 기록하지 않는다", async () => {
     const store = new FakeNodeStore();
